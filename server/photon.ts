@@ -57,10 +57,10 @@ export class PhotonSender {
   const participants=space.participantIds;
   if(space.projectId!==project || space.id!==target.spaceId || space.platform!=='sms' || space.kind!=='direct' || !Array.isArray(participants) || participants.length!==2 || !participants.includes(target.senderId) || !participants.includes(target.recipientId) || sender.projectId!==project || sender.id!==target.senderId || sender.platform!=='sms' || sender.kind!=='agent' || recipient.projectId!==project || recipient.id!==target.recipientId || recipient.platform!=='sms' || recipient.kind!=='human' || recipient.handle!==target.recipientPhone) throw Error('Photon conversation or recipient did not match the approved phone number.');
  }
- async send(target:PhotonTarget, body:string, key:string):Promise<string|null> {
+ async send(target:PhotonTarget, body:string, key:string, parentMessageId?:string):Promise<string|null> {
   const {url,key:apiKey,project}=this.base();
   try {
-   const r=await this.request(`${url}/messages`,{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'content-type':'application/json','idempotency-key':key},body:JSON.stringify({spaceId:target.spaceId,senderId:target.senderId,content:{type:'text',format:'plain',text:body}}),redirect:'error',signal:AbortSignal.timeout(10000)});
+   const r=await this.request(`${url}/messages`,{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'content-type':'application/json','idempotency-key':key},body:JSON.stringify({spaceId:target.spaceId,senderId:target.senderId,...(parentMessageId?{parentMessageId}:{}),content:{type:'text',format:'plain',text:body}}),redirect:'error',signal:AbortSignal.timeout(10000)});
    if(!r.ok) return null;
    const data=await r.json() as {id?:unknown;projectId?:unknown;space?:{id?:unknown};status?:unknown};
    if (typeof data.id!=='string' || !/^pho_msg_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(data.id) || data.projectId!==project || data.space?.id!==target.spaceId || !['dispatched','accepted','delivered'].includes(String(data.status))) return null;

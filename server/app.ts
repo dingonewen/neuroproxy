@@ -29,6 +29,7 @@ app.register(async (webhook) => {
   });
 });
 app.get('/api/graph', async () => store.graph());
+app.get('/api/imessage-conversations', async () => ({conversations:store.imessageSessions()}));
 app.patch('/api/nodes/:id', async req => {const b=req.body as {expectedLabel?:unknown;label?:unknown}|null;store.reviseNode((req.params as {id:string}).id,b?.expectedLabel,b?.label);return {ok:true};});
 app.delete('/api/conversations/:id', async req => {store.deleteConversation((req.params as {id:string}).id);return {ok:true};});
 app.get('/api/photon-inbox/:id/candidates', async req => ({candidates:store.photonCandidates((req.params as {id:string}).id)}));
@@ -72,6 +73,17 @@ app.post('/api/drafts/:id/approve-photon-phone', async (req, reply) => {
   const messageId=await photon.send(target,reserved.body,reserved.key);
   store.finishPhoton(id,messageId);
   return {status:messageId ? 'waiting_for_reply' : 'send_unknown'};
+});
+app.post('/api/drafts/:id/approve-photon-imessage', async (req,reply) => {
+ const b=req.body as {nodeId?:unknown;approvedHandle?:unknown;approvedBody?:unknown;consent?:unknown}|null;
+ if(!b || b.consent!==true || typeof b.nodeId!=='string' || typeof b.approvedHandle!=='string' || typeof b.approvedBody!=='string') return reply.code(400).send({error:'Review the recipient and exact message and confirm consent.'});
+ const target=store.imessageTarget(b.nodeId);
+ if(!target || target.humanHandle!==b.approvedHandle) return reply.code(400).send({error:'The selected iMessage conversation no longer matches the approved recipient.'});
+ const id=(req.params as {id:string}).id;
+ const reserved=store.reservePhoton(id,target.spaceId,target.senderId,target.recipientId,b.approvedBody,target.humanHandle);
+ const messageId=await photon.send({...target,recipientPhone:target.humanHandle},reserved.body,reserved.key,target.parentMessageId);
+ store.finishPhoton(id,messageId);
+ return {status:messageId?'waiting_for_reply':'send_unknown'};
 });
 app.post('/api/drafts/:id/approve-photon', async (req, reply) => {
   const b = req.body as (PhotonTarget & {approvedBody?:unknown;consent?:unknown}) | null;

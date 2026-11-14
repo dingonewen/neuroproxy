@@ -26,7 +26,7 @@ const deliverySchema = z.object({
  id, type:z.literal('message.received'),
  data:z.object({ projectId:id, object:z.object({
   id, projectId:id, platform:z.string(), status:z.literal('received'),
-  space:z.object({id}), sentBy:z.object({id, kind:z.string()}), receivedBy:z.object({id, kind:z.string()}),
+  space:z.object({id,kind:z.string().optional(),platform:z.string().optional()}), sentBy:z.object({id, kind:z.string(),handle:z.string().max(500).optional(),platform:z.string().optional()}), receivedBy:z.object({id, kind:z.string(),handle:z.string().max(500).optional(),platform:z.string().optional()}),
   parentMessageId:id.nullable().optional(), createdAt:z.string().datetime({offset:true}).optional(), content:z.object({type:z.literal('text'), text:z.string().trim().min(1).max(2000)}),
  }) }),
 });
@@ -35,6 +35,7 @@ export function parsePhotonMessage(value: unknown, projectId: string) {
  if (!parsed.success) return null;
  const {data}=parsed.data; const message=data.object;
  if (data.projectId !== projectId || message.projectId !== projectId || message.sentBy.kind !== 'human' || message.receivedBy.kind !== 'agent') return null;
- return {eventId:parsed.data.id, messageId:message.id, spaceId:message.space.id, senderId:message.sentBy.id, recipientId:message.receivedBy.id, parentMessageId:message.parentMessageId ?? null, createdAt:message.createdAt, body:message.content.text};
+ const imessage=message.platform==='imessage' && message.space.platform==='imessage' && message.space.kind==='direct' && message.sentBy.platform==='imessage' && message.receivedBy.platform==='imessage' && message.sentBy.id!==message.receivedBy.id && message.sentBy.handle && message.receivedBy.handle ? {humanHandle:message.sentBy.handle,agentHandle:message.receivedBy.handle} : undefined;
+ return {eventId:parsed.data.id, messageId:message.id, spaceId:message.space.id, senderId:message.sentBy.id, recipientId:message.receivedBy.id, parentMessageId:message.parentMessageId ?? null, createdAt:message.createdAt, body:message.content.text, imessage};
 }
-export type PhotonMessage = Omit<NonNullable<ReturnType<typeof parsePhotonMessage>>, 'createdAt'> & {createdAt?: string};
+export type PhotonMessage = Omit<NonNullable<ReturnType<typeof parsePhotonMessage>>, 'createdAt'|'imessage'> & {createdAt?: string;imessage?:{humanHandle:string;agentHandle:string}};

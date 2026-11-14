@@ -11,6 +11,7 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS nodes (id TEXT PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, status TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'user'); CREATE TABLE IF NOT EXISTS edges (id TEXT PRIMARY KEY, source TEXT NOT NULL REFERENCES nodes(id), target TEXT NOT NULL REFERENCES nodes(id), label TEXT NOT NULL); CREATE TABLE IF NOT EXISTS drafts (id TEXT PRIMARY KEY, person TEXT NOT NULL, body TEXT NOT NULL, state TEXT NOT NULL, person_id TEXT NOT NULL REFERENCES nodes(id), task_id TEXT NOT NULL REFERENCES nodes(id), message_id TEXT NOT NULL REFERENCES nodes(id));`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_inbox (event_id TEXT PRIMARY KEY, message_id TEXT NOT NULL UNIQUE, space_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, node_id TEXT NOT NULL REFERENCES nodes(id));`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS imessage_sessions (node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, human_handle TEXT NOT NULL, agent_handle TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_dispatches (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), space_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, status TEXT NOT NULL, photon_message_id TEXT UNIQUE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_preparations (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), recipient_phone TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, approved_at TEXT NOT NULL);`);
   }
@@ -120,6 +121,7 @@ export class Store {
       }
       const nodeId = this.node('reply', message.body, match ? (inferred ? 'possible_reply' : 'received') : 'unlinked', 'photon');
       this.db.prepare('INSERT INTO photon_inbox VALUES (?,?,?,?,?,?)').run(message.eventId, message.messageId, message.spaceId, message.senderId, message.recipientId, nodeId);
+      if(message.imessage) this.db.prepare('INSERT INTO imessage_sessions VALUES (?,?,?)').run(nodeId,message.imessage.humanHandle,message.imessage.agentHandle);
       if (match) {
         this.edge(match.message_id, nodeId, inferred ? 'possible reply' : 'reply'); this.edge(match.person_id, nodeId, 'from');
         const state=inferred ? 'possible_reply' : 'reply_received';
@@ -128,6 +130,12 @@ export class Store {
       }
       this.db.exec('COMMIT'); return true;
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  imessageSessions() {
+    return this.db.prepare(`SELECT s.node_id AS nodeId,s.human_handle AS humanHandle,s.agent_handle AS agentHandle FROM imessage_sessions s JOIN photon_inbox i ON i.node_id=s.node_id ORDER BY i.rowid DESC LIMIT 50`).all();
+  }
+  imessageTarget(nodeId:string) {
+    return this.db.prepare(`SELECT i.space_id AS spaceId,i.recipient_id AS senderId,i.sender_id AS recipientId,i.message_id AS parentMessageId,s.human_handle AS humanHandle FROM imessage_sessions s JOIN photon_inbox i ON i.node_id=s.node_id WHERE s.node_id=?`).get(nodeId) as {spaceId:string;senderId:string;recipientId:string;parentMessageId:string;humanHandle:string}|undefined;
   }
   reviewPossibleReply(nodeId:string, confirm:boolean) {
     this.db.exec('BEGIN IMMEDIATE');
@@ -157,7 +165,7 @@ export class Store {
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
-  reservePhoton(id: string, spaceId: string, senderId: string, recipientId: string, approvedBody: string) {
+  reservePhoton(id: string, spaceId: string, senderId: string, recipientId: string, approvedBody: string, trackingHandle?:string) {
     if (!/^pho_spc_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(spaceId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(senderId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(recipientId) || senderId === recipientId) throw new Error('Enter valid, distinct Photon space and user IDs.');
     this.db.exec('BEGIN IMMEDIATE');
     try {
@@ -165,6 +173,7 @@ export class Store {
       if (!draft || draft.state !== 'pending_approval') throw new Error('Draft is not awaiting approval.');
       if (approvedBody !== labelRealSms(draft.body)) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       const key = randomUUID();
+      if(trackingHandle) this.db.prepare('INSERT INTO photon_preparations VALUES (?,?,?,?)').run(id,trackingHandle,key,new Date().toISOString());
       this.db.prepare('INSERT INTO photon_dispatches VALUES (?,?,?,?,?,?,NULL)').run(id,spaceId,senderId,recipientId,key,'submitting');
       this.db.prepare("UPDATE drafts SET state='submitting', body=? WHERE id=?").run(approvedBody,id);
       this.db.prepare("UPDATE nodes SET status='submitting', source='photon', label=? WHERE id=?").run(approvedBody,draft.message_id);
