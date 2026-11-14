@@ -18,13 +18,44 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_dispatches (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), space_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, status TEXT NOT NULL, photon_message_id TEXT UNIQUE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_preparations (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), recipient_phone TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, approved_at TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_message_labels (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), label TEXT NOT NULL);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, name TEXT NOT NULL, handle TEXT NOT NULL); CREATE TABLE IF NOT EXISTS person_contacts (person_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, contact_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE);`);
+  }
+  contacts() {return this.db.prepare('SELECT id,name,handle FROM contacts ORDER BY name COLLATE NOCASE,id').all();}
+  createContact(name:unknown,handle:unknown) {
+    if(typeof name!=='string'||!name.trim()||name.trim().length>100||typeof handle!=='string') throw Error('Enter a contact name and phone number or email.');
+    const value=handle.trim();if(!/^\+[1-9]\d{7,14}$/.test(value)&&! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) throw Error('Use an E.164 phone number or an iMessage email address.');
+    if(value.length>254)throw Error('Contact address is too long.');
+    const id=randomUUID();this.db.prepare('INSERT INTO contacts VALUES (?,?,?)').run(id,name.trim(),value);return {id};
+  }
+  deleteContact(id:string) {
+    this.db.exec('BEGIN IMMEDIATE');try {
+      if(this.db.prepare("SELECT 1 FROM person_contacts p JOIN drafts d ON d.person_id=p.person_id WHERE p.contact_id=? AND d.state IN ('preparing','submitting') LIMIT 1").get(id))throw Error('A message to this contact is being sent. Try again after it finishes.');
+      if(!this.db.prepare('DELETE FROM contacts WHERE id=?').run(id).changes)throw Error('Contact not found.');
+      this.db.exec('COMMIT');
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  bindContact(personId:string,contactId:unknown) {
+    if(typeof contactId!=='string')throw Error('Choose a contact.');
+    this.db.exec('BEGIN IMMEDIATE');try {
+      if(!this.db.prepare("SELECT 1 FROM nodes WHERE id=? AND kind='person'").get(personId)||!this.db.prepare('SELECT 1 FROM contacts WHERE id=?').get(contactId))throw Error('Person or contact not found.');
+      const current=this.db.prepare('SELECT contact_id FROM person_contacts WHERE person_id=?').get(personId) as {contact_id:string}|undefined;
+      if(current?.contact_id!==contactId && this.db.prepare("SELECT 1 FROM drafts WHERE person_id=? AND state NOT IN ('pending_approval','cancelled') LIMIT 1").get(personId))throw Error('This person has message history and cannot be rebound.');
+      this.db.prepare('INSERT INTO person_contacts VALUES (?,?) ON CONFLICT(person_id) DO UPDATE SET contact_id=excluded.contact_id').run(personId,contactId);
+      this.db.exec('COMMIT');
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  requireContact(personId:string,handle:string|undefined) {
+    const contact=this.db.prepare('SELECT c.handle FROM contacts c JOIN person_contacts p ON p.contact_id=c.id WHERE p.person_id=?').get(personId) as {handle:string}|undefined;
+    if(!contact) throw Error('Choose and confirm a contact before sending.');
+    if(!handle || contact.handle.toLocaleLowerCase()!==handle.trim().toLocaleLowerCase()) throw Error('The recipient does not match the selected contact.');
   }
   preparePhone(id: string, phone: string, approvedBody: string, label?:string) {
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) throw new Error('Enter the recipient number in E.164 format.');
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const draft=this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string}|undefined;
+      const draft=this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string;person_id:string}|undefined;
       if (!draft || !['pending_approval','preparation_failed'].includes(draft.state)) throw new Error('Draft is not awaiting approval.');
+      this.requireContact(draft.person_id,phone);
       const stored=this.db.prepare('SELECT label FROM photon_message_labels WHERE draft_id=?').get(id) as {label:string}|undefined;
       if (draft.state==='preparation_failed' && stored && stored.label!==label) throw new Error('A retry must use the previously approved label.');
       if (labelRealSms(draft.body,label)!==approvedBody) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
@@ -63,7 +94,7 @@ export class Store {
   }
   node(kind: string, label: string, status = '', source = 'user') { const id = randomUUID(); this.db.prepare('INSERT INTO nodes VALUES (?,?,?,?,?)').run(id, kind, label, status, source); return id; }
   edge(source: string, target: string, label: string) { this.db.prepare('INSERT INTO edges VALUES (?,?,?,?)').run(randomUUID(), source, target, label); }
-  graph() { return { nodes: this.db.prepare('SELECT * FROM nodes ORDER BY rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id ORDER BY drafts.rowid DESC').all() }; }
+  graph() { return { nodes: this.db.prepare('SELECT nodes.*, c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM nodes LEFT JOIN person_contacts pc ON pc.person_id=nodes.id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY nodes.rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label,c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id LEFT JOIN person_contacts pc ON pc.person_id=drafts.person_id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY drafts.rowid DESC').all() }; }
   reviseNode(id:string, expectedLabel:unknown, label:unknown) {
     if(typeof expectedLabel!=='string' || typeof label!=='string' || !label.trim()) throw Error('Enter the revised content.');
     this.db.exec('BEGIN IMMEDIATE');
@@ -185,8 +216,9 @@ export class Store {
     if (!/^pho_spc_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(spaceId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(senderId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(recipientId) || senderId === recipientId) throw new Error('Enter valid, distinct Photon space and user IDs.');
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const draft = this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string}|undefined;
+      const draft = this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string;person_id:string}|undefined;
       if (!draft || draft.state !== 'pending_approval') throw new Error('Draft is not awaiting approval.');
+      this.requireContact(draft.person_id,trackingHandle);
       if (approvedBody !== labelRealSms(draft.body,label)) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       const key = randomUUID();
       if(label) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);

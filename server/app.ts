@@ -29,6 +29,10 @@ app.register(async (webhook) => {
   });
 });
 app.get('/api/graph', async () => store.graph());
+app.get('/api/contacts', async () => ({contacts:store.contacts()}));
+app.post('/api/contacts', async req=>{const b=req.body as {name?:unknown;handle?:unknown}|null;return store.createContact(b?.name,b?.handle);});
+app.delete('/api/contacts/:id', async req=>{store.deleteContact((req.params as {id:string}).id);return {ok:true};});
+app.put('/api/people/:id/contact', async req=>{const b=req.body as {contactId?:unknown}|null;store.bindContact((req.params as {id:string}).id,b?.contactId);return {ok:true};});
 app.get('/api/imessage-conversations', async () => ({conversations:store.imessageSessions()}));
 app.patch('/api/nodes/:id', async req => {const b=req.body as {expectedLabel?:unknown;label?:unknown}|null;store.reviseNode((req.params as {id:string}).id,b?.expectedLabel,b?.label);return {ok:true};});
 app.delete('/api/conversations/:id', async req => {store.deleteConversation((req.params as {id:string}).id);return {ok:true};});
@@ -90,7 +94,7 @@ app.post('/api/drafts/:id/approve-photon', async (req, reply) => {
   if (!b || b.consent !== true || typeof b.approvedBody !== 'string' || typeof b.spaceId !== 'string' || typeof b.senderId !== 'string' || typeof b.recipientId !== 'string' || typeof b.recipientPhone !== 'string') return reply.code(400).send({error:'Confirm recipient consent and approve the exact draft.'});
   try { await photon.verifyTarget(b); } catch { return reply.code(400).send({error:'Could not verify the Photon SMS conversation and recipient.'}); }
   const id=(req.params as {id:string}).id;
-  const reserved=store.reservePhoton(id,b.spaceId,b.senderId,b.recipientId,b.approvedBody);
+  const reserved=store.reservePhoton(id,b.spaceId,b.senderId,b.recipientId,b.approvedBody,b.recipientPhone);
   const messageId=await photon.send(b,reserved.body,reserved.key);
   store.finishPhoton(id,messageId);
   return {status:messageId ? 'waiting_for_reply' : 'send_unknown'};

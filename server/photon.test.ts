@@ -1,3 +1,4 @@
+import { bindTestContact } from './test-contact.ts';
 import { test } from 'node:test';
 import { labelRealSms } from '../shared/sms.ts';
 import { strict as assert } from 'node:assert';
@@ -38,7 +39,7 @@ function fakeSender(sendResult:'success'|'unknown'='success') {
  return {client:new PhotonSender({apiKey:'pho_sk_test',projectId:project},mock),sends:()=>sends};
 }
 test('real send requires explicit consent, exact draft and a verified recipient; duplicate approval is rejected',async()=>{
- const store=new Store(':memory:');const fake=fakeSender();const app=createApp(store,undefined,undefined,fake.client);const id=store.create('Project','Alex','Deadline','When?');
+ const store=new Store(':memory:');const fake=fakeSender();const app=createApp(store,undefined,undefined,fake.client);const id=store.create('Project','Alex','Deadline','When?');bindTestContact(store,id);
  try {
   const call=(payload:object)=>app.inject({method:'POST',url:`/api/drafts/${id}/approve-photon`,payload});
   assert.equal((await call({...target,approvedBody:labelRealSms('When?'),consent:false})).statusCode,400);
@@ -55,6 +56,6 @@ test('real send requires explicit consent, exact draft and a verified recipient;
  } finally {await app.close();store.close();}
 });
 test('unknown send outcome is not automatically retried',async()=>{
- const store=new Store(':memory:');const fake=fakeSender('unknown');const app=createApp(store,undefined,undefined,fake.client);const id=store.create('Project','Alex','Deadline','When?');
+ const store=new Store(':memory:');const fake=fakeSender('unknown');const app=createApp(store,undefined,undefined,fake.client);const id=store.create('Project','Alex','Deadline','When?');bindTestContact(store,id);
  try {const payload={...target,approvedBody:labelRealSms('When?'),consent:true};const call=()=>app.inject({method:'POST',url:`/api/drafts/${id}/approve-photon`,payload});const result=await call();assert.equal(result.json().status,'send_unknown');assert.equal((await call()).statusCode,400);assert.equal(fake.sends(),1);} finally {await app.close();store.close();}
 });

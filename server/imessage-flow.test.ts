@@ -1,3 +1,4 @@
+import { bindTestContact } from './test-contact.ts';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { createHmac } from 'node:crypto';
@@ -23,9 +24,11 @@ test('signed inbound iMessage enables only an explicitly approved reply and trac
   const body=JSON.stringify(event),timestamp=String(Math.floor(Date.now()/1000)),delivery='test-delivery';const signature=createHmac('sha256',Buffer.from(secret.slice(6),'base64')).update(`${delivery}.${timestamp}.`).update(body).digest('base64');
   assert.equal((await app.inject({method:'POST',url:'/api/webhooks/photon',headers:{'content-type':'application/json','webhook-id':delivery,'webhook-timestamp':timestamp,'webhook-signature':`v1,${signature}`},payload:body})).statusCode,204);
   const sessions=(await app.inject({method:'GET',url:'/api/imessage-conversations'})).json().conversations;assert.equal(sessions.length,1);
-  const draft=store.create('Test','Me','Check','Hello');const url=`/api/drafts/${draft}/approve-photon-imessage`;const label='From NeuroProxy';const approved={nodeId:sessions[0].nodeId,approvedHandle:'+14155550123',approvedBody:labelRealSms('Hello',label),consent:true,label};
+  const draft=store.create('Test','Me','Check','Hello');bindTestContact(store,draft);const url=`/api/drafts/${draft}/approve-photon-imessage`;const label='From NeuroProxy';const approved={nodeId:sessions[0].nodeId,approvedHandle:'+14155550123',approvedBody:labelRealSms('Hello',label),consent:true,label};
   assert.equal((await app.inject({method:'POST',url,payload:{...approved,consent:false}})).statusCode,400);
   assert.equal((await app.inject({method:'POST',url,payload:{...approved,approvedHandle:'+14155559999'}})).statusCode,400);
+  const alternate=store.createContact('Me','+14155550125');const personId=String(store.graph().drafts.find(d=>d.id===draft)?.person_id);store.bindContact(personId,alternate.id);
+  assert.equal((await app.inject({method:'POST',url,payload:approved})).statusCode,400);assert.equal(sends,0);bindTestContact(store,draft);
   assert.equal((await app.inject({method:'POST',url,payload:{...approved,label:'From an assistant'}})).statusCode,400);
   assert.equal((await app.inject({method:'POST',url,payload:{...approved,approvedBody:'Hello'}})).statusCode,400);assert.equal(sends,0);
   const sent=await app.inject({method:'POST',url,payload:approved});assert.equal(sent.statusCode,200);assert.equal(sent.json().status,'waiting_for_reply');assert.equal(sends,1);

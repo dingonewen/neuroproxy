@@ -1,3 +1,4 @@
+import { bindTestContact } from './test-contact.ts';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -13,7 +14,7 @@ test('delete removes the selected Photon conversation and prevents webhook repla
  try {
   const created=store.createReviewed({topic:'Delete me',people:['A'],tasks:[{description:'Ask',assignee:'A'}],uncertainties:[],draft:{recipient:'A',taskIndex:0,body:'Hello'}});
   const other=store.createReviewed({topic:'Keep me',people:[],tasks:[],uncertainties:[],draft:null});
-  store.reservePhoton(created.draftId!,space,agent,human,labelRealSms('Hello'),'+14155550123');store.finishPhoton(created.draftId!,sent);assert.equal(store.receivePhoton(reply),true);
+  bindTestContact(store,created.draftId!);store.reservePhoton(created.draftId!,space,agent,human,labelRealSms('Hello'),'+14155550123');store.finishPhoton(created.draftId!,sent);assert.equal(store.receivePhoton(reply),true);
   store.deleteConversation(created.topicId);let graph=store.graph();assert.ok(!graph.nodes.some(n=>n.id===created.topicId || n.label==='Synthetic reply'));assert.ok(graph.nodes.some(n=>n.id===other.topicId));assert.equal(graph.drafts.length,0);assert.equal(store.imessageSessions().length,0);
   store.close();store=new Store(path);assert.equal(store.receivePhoton(reply),false);assert.equal(store.receivePhoton({...reply,eventId:'redelivery-with-another-id'}),false);
   graph=store.graph();assert.ok(!graph.nodes.some(n=>n.label==='Synthetic reply'));assert.ok(graph.nodes.some(n=>n.id===other.topicId));

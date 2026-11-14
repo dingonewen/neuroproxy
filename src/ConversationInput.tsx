@@ -3,7 +3,7 @@ import type { Extraction } from '../shared/extraction';
 import { InfoTip } from './InfoTip';
 import { SavedContext } from './SavedContext';
 
-export function ConversationInput({ onSaved, onPreview, savedNodes, showingPreview, navigation, onRefresh }: { onSaved: (topicId:string, context:Extraction, draftId:string|null) => Promise<void>; onPreview:(result:Extraction|null)=>void; savedNodes:{id:string;kind:string;label:string;status:string;source:string}[]; showingPreview:boolean; navigation:{id:string;nonce:number}|null; onRefresh:()=>Promise<void> }) {
+export function ConversationInput({ onSaved, onPreview, savedNodes, showingPreview, navigation, onRefresh }: { onSaved: (topicId:string, context:Extraction, draftId:string|null) => Promise<void>; onPreview:(result:Extraction|null)=>void; savedNodes:{id:string;kind:string;label:string;status:string;source:string;contact_id?:string|null;contact_name?:string|null;contact_handle?:string|null}[]; showingPreview:boolean; navigation:{id:string;nonce:number}|null; onRefresh:()=>Promise<void> }) {
  const [text, setText] = useState('');
  const [result, setResult] = useState<Extraction | null>(null);
  const [busy, setBusy] = useState(false);

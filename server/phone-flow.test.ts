@@ -1,3 +1,4 @@
+import { bindTestContact } from './test-contact.ts';
 import { test } from 'node:test';
 import { createHmac } from 'node:crypto';
 import { strict as assert } from 'node:assert';
@@ -30,7 +31,7 @@ function setup(options:{failSetup?:boolean;failSend?:boolean}={}) {
 }
 const payload={recipientPhone:phone,approvedBody:labelRealSms('When?'),consent:true};
 test('phone-based approval prepares users and space, sends once, and reviews inferred replies',async()=>{
- const {store,app,calls}=setup(); const id=store.create('Project','Alex','Deadline','When?'); const url=`/api/drafts/${id}/approve-photon-phone`;
+ const {store,app,calls}=setup(); const id=store.create('Project','Alex','Deadline','When?');bindTestContact(store,id); const url=`/api/drafts/${id}/approve-photon-phone`;
  try {
   assert.equal((await app.inject({method:'POST',url,payload:{...payload,consent:false}})).statusCode,400);
   assert.equal((await app.inject({method:'POST',url,payload:{...payload,approvedBody:'Wrong'}})).statusCode,400);
@@ -45,7 +46,7 @@ test('phone-based approval prepares users and space, sends once, and reviews inf
  } finally {await app.close();store.close();}
 });
 test('setup failure never sends, can retry only after approval; unknown outcome cannot retry',async()=>{
- for(const mode of ['setup','send'] as const){const {store,app,calls}=setup(mode==='setup'?{failSetup:true}:{failSend:true});const id=store.create('Project','Alex','Deadline','When?');const url=`/api/drafts/${id}/approve-photon-phone`;
+ for(const mode of ['setup','send'] as const){const {store,app,calls}=setup(mode==='setup'?{failSetup:true}:{failSend:true});const id=store.create('Project','Alex','Deadline','When?');bindTestContact(store,id);const url=`/api/drafts/${id}/approve-photon-phone`;
   try {const res=await app.inject({method:'POST',url,payload}); assert.equal(res.statusCode,mode==='setup'?502:200); assert.equal(store.graph().drafts[0].state,mode==='setup'?'preparation_failed':'send_unknown'); assert.equal(calls.filter(c=>c.path==='/messages').length,mode==='setup'?0:1);
    if(mode==='send') assert.equal((await app.inject({method:'POST',url,payload})).statusCode,400);
    else assert.equal((await app.inject({method:'POST',url:`/api/drafts/${id}/cancel`})).statusCode,200);
@@ -54,12 +55,12 @@ test('setup failure never sends, can retry only after approval; unknown outcome 
 });
 
 test('simultaneous approvals cannot send twice',async()=>{
- const {store,app,calls}=setup();const id=store.create('Project','Alex','Deadline','When?'); const url=`/api/drafts/${id}/approve-photon-phone`;
+ const {store,app,calls}=setup();const id=store.create('Project','Alex','Deadline','When?');bindTestContact(store,id); const url=`/api/drafts/${id}/approve-photon-phone`;
  try {const results=await Promise.all([app.inject({method:'POST',url,payload}),app.inject({method:'POST',url,payload})]);assert.deepEqual(results.map(r=>r.statusCode).sort(),[200,400]);assert.equal(calls.filter(c=>c.path==='/messages').length,1);} finally {await app.close();store.close();}
 });
 
 test('a custom signature stays unchanged when preparation fails and is retried',()=>{
- const store=new Store(':memory:');try {const id=store.create('Project','Alex','Check','Hello');const label='via NeuroProxy';const body=labelRealSms('Hello',label);
+ const store=new Store(':memory:');try {const id=store.create('Project','Alex','Check','Hello');bindTestContact(store,id);const label='via NeuroProxy';const body=labelRealSms('Hello',label);
   store.preparePhone(id,phone,body,label);store.failPreparation(id);
   assert.equal(store.graph().drafts[0].message_label,label);
   assert.throws(()=>store.preparePhone(id,phone,labelRealSms(body,'Another NeuroProxy label'),'Another NeuroProxy label'),/previously approved label/);
@@ -68,7 +69,7 @@ test('a custom signature stays unchanged when preparation fails and is retried',
 });
 
 test('ambiguous inbound messages remain unlinked and can only be attached to a matching delegation',async()=>{
- const {store,app}=setup(); const one=store.create('Project','Alex','First','When?');const two=store.create('Project','Alex','Second','When?');
+ const {store,app}=setup(); const one=store.create('Project','Alex','First','When?');const two=store.create('Project','Alex','Second','When?');bindTestContact(store,one);bindTestContact(store,two);
  try {
   for(const id of [one,two]) assert.equal((await app.inject({method:'POST',url:`/api/drafts/${id}/approve-photon-phone`,payload})).statusCode,200);
   store.receivePhoton({eventId:'ambiguous',messageId:'r1',spaceId:space,senderId:recipient,recipientId:sender,parentMessageId:null,createdAt:new Date(Date.now()+1000).toISOString(),body:'Saturday'});
@@ -85,7 +86,7 @@ test('conversation to approved SMS to signed webhook and confirmed graph update'
  const {store,app}=setup();
  try {
   const analysis=await app.inject({method:'POST',url:'/api/extract',payload:{text:'Please ask Alex when.'}});assert.equal(analysis.statusCode,200);assert.equal(store.graph().nodes.length,0);
-  const saved=await app.inject({method:'POST',url:'/api/reviewed-context',payload:analysis.json()});assert.equal(saved.statusCode,200);const id=saved.json().draftId;
+  const saved=await app.inject({method:'POST',url:'/api/reviewed-context',payload:analysis.json()});assert.equal(saved.statusCode,200);const id=saved.json().draftId;bindTestContact(store,id);
   const sent=await app.inject({method:'POST',url:`/api/drafts/${id}/approve-photon-phone`,payload});assert.equal(sent.statusCode,200);
   const incoming={id:'evt-synthetic',type:'message.received',data:{projectId:project,object:{id:'reply-synthetic',projectId:project,platform:'sms',status:'received',space:{id:space},sentBy:{id:recipient,kind:'human'},receivedBy:{id:sender,kind:'agent'},createdAt:new Date(Date.now()+1000).toISOString(),content:{type:'text',text:'Saturday'}}}};
   const body=JSON.stringify(incoming);const delivery='delivery-synthetic';const timestamp=String(Math.floor(Date.now()/1000));const signature=createHmac('sha256',Buffer.from(testSecret.slice(6),'base64')).update(`${delivery}.${timestamp}.`).update(body).digest('base64');

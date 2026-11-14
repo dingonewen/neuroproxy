@@ -27,3 +27,7 @@ The Photon shared-line number is separate from `PHOTON_SMS_NUMBER`. Shared iMess
 ## Phone voice
 
 Phone voice is not integrated with NeuroProxy yet. [Photon's Beta voice guide](https://photon.codes/docs/beta/get-started/voice) describes routing an eligible Photon number to an ElevenLabs agent over SIP. The voice provider must still be integrated with NeuroProxy's graph and approval workflow; an independently answered test call does not verify that integration. Shared iMessage lines cannot receive phone calls.
+
+## Contacts for a demo
+
+After saving a conversation, select a Person card in Saved Context or open a pending delegation. Under **Contact**, add a name and an E.164 phone number or iMessage email, then select and **Confirm Contact**. Contacts with the same name remain separate; compare their full addresses before choosing. The binding is saved on that conversation's person node, while contacts can be reused in another conversation after explicit confirmation. A real send requires a binding, and the backend checks that the selected SMS number or iMessage conversation matches it. Simulation does not require a contact. The app stores contacts locally and does not import the phone address book. Deleting a conversation leaves reusable contacts intact; use **Delete Contact** to remove one and its bindings. Existing iMessage shared-line assignment and recipient consent are still required.
