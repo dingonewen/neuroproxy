@@ -23,7 +23,7 @@ Reported facts, expressed feelings and needs, and possible interpretations are k
 - Graph PDF export was manually checked for correctness; its visual presentation could still be improved.
 - Simulated messages and automated mock tests exercise the approval and reply pipelines without contacting a real person.
 
-The core MVP has been validated end to end. Asynchronous voice messages are not implemented. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. The desktop interface has been redesigned; the phone layout still needs visual testing and refinement. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
+The core MVP has been validated end to end. The new browser voice-note flow and phone layout still need a real-device test. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
 
 ## Run locally
 
@@ -63,6 +63,12 @@ Subscribe the Photon destination to `message.received` and route it to `POST /ap
 Select a saved conversation and use **Delete** to remove its local graph, drafts, and messaging records. Messages already sent remain in Photon and on recipients' devices. Hashed event identifiers remain to prevent deleted incoming events from reappearing on webhook replay. Deleting a conversation leaves reusable contacts intact.
 
 ## Voice
+
+**Asynchronous browser voice note:** Open Voice Note under Hear the Meaning, record up to one minute, and send it. ElevenLabs transcribes the audio, then the configured AI provider analyzes the transcript in the background. Return in the same browser to review the result or listen to a short summary using the device's speech voice. Save the reviewed context to add it to the Graph; sending any draft still requires separate approval. Delete Note removes the stored transcript and analysis; the audio is not stored. A server restart interrupts an unfinished note and it must be recorded again. Only one note is processed at a time. This flow uses ElevenLabs speech-to-text and is separate from Photon phone calls; it has not yet been tested on iPhone.
+
+**Suggested delegation:** Delegate reuses the suggested action saved in the conversation and preselects the person when there is only one. You can change the action or recipient and generate a message draft for separate approval. If analysis already suggested a message, its draft appears in Messages & Drafts. Generating a message sends the saved conversation to the configured AI provider.
+
+**Private phone access:** `localhost` on an iPhone points to the phone itself. To reach the laptop, use a separate HTTPS hostname protected by a Cloudflare Access application with a policy limited to your own account. Set `NEUROPROXY_WEB_HOST` to that exact hostname and restart Vite, then route the hostname through the tunnel to `http://127.0.0.1:5173`. Keep the existing provider webhook hostname and its path restrictions separate. Vite's allowed-host setting is not authentication: do not create an unprotected public route to the app or its API. The laptop and tunnel must remain running.
 
 **Browser:** On a supported browser, choose a language and turn on the voice switch in Hear the Meaning or Find Your Way Back. Allow microphone access, speak, and turn the switch off before reviewing the recognized text. Browser speech recognition may send audio to the browser's speech provider. Voice input does not send or approve messages.
 
