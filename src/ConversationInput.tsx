@@ -7,6 +7,7 @@ import { VoiceInput } from './VoiceInput';
 
 export function ConversationInput({ onSaved, onPreview, savedNodes, showingPreview, navigation, onRefresh }: { onSaved: (topicId:string, context:Extraction, draftId:string|null) => Promise<void>; onPreview:(result:Extraction|null)=>void; savedNodes:{id:string;kind:string;label:string;status:string;source:string;contact_id?:string|null;contact_name?:string|null;contact_handle?:string|null}[]; showingPreview:boolean; navigation:{id:string;nonce:number}|null; onRefresh:()=>Promise<void> }) {
  const [text, setText] = useState('');
+ const [languageSlot,setLanguageSlot]=useState<HTMLDivElement|null>(null);
  const [listening,setListening]=useState(false);
  const [result, setResult] = useState<Extraction | null>(null);
  const [busy, setBusy] = useState(false);
@@ -35,8 +36,8 @@ export function ConversationInput({ onSaved, onPreview, savedNodes, showingPrevi
  }
  return <section className="conversation-panel">
   <div className="panel-heading"><span className="eyebrow">01 / Understand</span><h2><MessageCircle className="heading-icon" aria-hidden="true"/>Understand a Conversation</h2></div>
-  <div className="input-label"><label htmlFor="conversation-text">Conversation</label><InfoTip>Analyze, review the suggestions, then save them to the graph.</InfoTip></div><textarea id="conversation-text" className="conversation-textarea" maxLength={8000} disabled={busy||listening} value={text} onChange={e=>{setText(e.target.value); setResult(null); setSaved(false);}} />
-  <div className="conversation-input-actions"><VoiceInput disabled={busy} onListeningChange={setListening} onTranscript={part=>{setText(previous=>(previous ? `${previous.trimEnd()} ${part}` : part).slice(0,8000));setResult(null);setSaved(false);}}/>
+  <div className="input-label"><label htmlFor="conversation-text">Conversation</label><InfoTip>Analyze, review the suggestions, then save them to the graph.</InfoTip><div className="language-slot" ref={setLanguageSlot}/></div><textarea id="conversation-text" className="conversation-textarea" maxLength={8000} disabled={busy||listening} value={text} onChange={e=>{setText(e.target.value); setResult(null); setSaved(false);}} />
+  <div className="conversation-input-actions"><VoiceInput languageSlot={languageSlot} disabled={busy} onListeningChange={setListening} onTranscript={part=>{setText(previous=>(previous ? `${previous.trimEnd()} ${part}` : part).slice(0,8000));setResult(null);setSaved(false);}}/>
   <div className="analyze-actions"><button className="analyze-button" type="button" disabled={busy || listening || !text.trim()} onClick={analyze}>{busy ? 'Working…' : <><Sparkles className="button-icon" aria-hidden="true"/>Analyze</>}</button></div></div>
   {error && <p role="alert">{error}</p>}{saved && <p role="status">Saved to the graph. Any message draft still requires approval.</p>}
   {result && showingPreview && <fieldset disabled={busy} className="review"><div className="review-heading"><h3>Review Before Saving</h3><p>Correct or remove anything inaccurate.</p></div>

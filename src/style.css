@@ -275,3 +275,32 @@ button.voice-switch[aria-checked="true"],button.voice-switch[aria-checked="true"
 .conversation-panel .conversation-textarea{margin-top:0}
 .recovery-panel .recovery-voice-actions .ask-button{box-shadow:3px 3px 0 hsl(var(--shadow-color))}
 .recovery-panel .recovery-voice-actions .ask-button:hover:not(:disabled),.recovery-panel .recovery-voice-actions .ask-button:active:not(:disabled){box-shadow:none}
+
+/* Align stage actions and language selectors without consuming an extra row. */
+.graph-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.graph-topline .eyebrow{width:max-content}.graph-topline .graph-actions{margin:0}
+.language-slot{display:inline-flex;align-items:center;margin-left:auto;min-width:0}
+.language-slot .voice-language{display:flex;align-items:center;gap:4px;margin:0}
+.language-slot .voice-language label{margin:0;font-size:.72rem;white-space:nowrap}
+.language-slot .voice-language .info-tip{margin-left:0}
+.language-slot .voice-language select{width:auto;max-width:100px;margin:0;padding:4px 6px;font-size:.72rem}
+.conversation-panel .input-label,.recovery-panel .input-label{width:100%;min-height:30px}
+.conversation-input-actions .voice-controls,.recovery-voice-actions .voice-controls{gap:0}
+@media(min-width:1051px){.delegation-messages{margin-right:-12px;padding-right:8px}.conversation-panel .saved-context{margin-top:8px}}
+
+/* Give the upper desktop panels more breathing room. */
+@media(min-width:1051px){
+ main{grid-template-rows:minmax(235px,auto) minmax(312px,40vh) minmax(1008px,120vh)}
+ .graph-topline .graph-actions{position:relative;top:8px}
+ .recovery-panel .recovery-voice-actions{margin-top:20px}
+}
+
+/* Compact reviewed cards and align graph actions with the conversation picker. */
+section.graph{background:hsl(var(--primary) / .13)}
+.graph-conversation-label{gap:2px;flex-wrap:wrap}.graph-conversation-label .graph-actions{margin:0 0 0 auto;position:static;gap:8px}
+.graph-conversation-label .graph-actions button{font-size:.76rem;padding:7px 10px}
+.conversation-panel .saved-topic-card{display:block}
+.saved-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+.saved-overview-grid>div{min-width:0}.saved-overview-grid .category-card{margin-top:10px}
+.saved-context .topic-card{padding:12px}.saved-context .category-card{padding:10px}.saved-context .nested-card{padding:8px;margin:7px 0}
+@container (min-width:520px){.conversation-panel .saved-relationship-grid{display:block;columns:2;column-gap:10px}.saved-relationship-group{break-inside:avoid}}
+@media(max-width:620px){.saved-overview-grid{grid-template-columns:1fr}}

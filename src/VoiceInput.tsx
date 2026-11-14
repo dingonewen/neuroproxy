@@ -1,6 +1,7 @@
 import { Mic } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { InfoTip } from './InfoTip';
+import { createPortal } from 'react-dom';
 
 type SpeechResult={isFinal:boolean;[index:number]:{transcript:string}};
 type SpeechEvent={resultIndex:number;results:ArrayLike<SpeechResult>};
@@ -8,7 +9,7 @@ type SpeechError={error:string};
 type Recognition={lang:string;continuous:boolean;interimResults:boolean;onresult:((e:SpeechEvent)=>void)|null;onerror:((e:SpeechError)=>void)|null;onend:(()=>void)|null;start:()=>void;stop:()=>void;abort:()=>void};
 type SpeechWindow=Window & {SpeechRecognition?:new()=>Recognition;webkitSpeechRecognition?:new()=>Recognition};
 
-export function VoiceInput({onTranscript,onListeningChange,disabled=false}:{onTranscript:(text:string)=>void;onListeningChange:(listening:boolean)=>void;disabled?:boolean}) {
+export function VoiceInput({onTranscript,onListeningChange,disabled=false,languageSlot}:{onTranscript:(text:string)=>void;onListeningChange:(listening:boolean)=>void;disabled?:boolean;languageSlot?:HTMLElement|null}) {
  const [listening,setListening]=useState(false);const [stopping,setStopping]=useState(false);const [interim,setInterim]=useState('');const [notice,setNotice]=useState('');const [language,setLanguage]=useState(navigator.language?.startsWith('zh')?'zh-CN':'en-US');
  const recognition=useRef<Recognition|null>(null);const callbacks=useRef({onTranscript,onListeningChange});callbacks.current={onTranscript,onListeningChange};
  const languageId=useId();
@@ -24,5 +25,6 @@ export function VoiceInput({onTranscript,onListeningChange,disabled=false}:{onTr
  }
  function stop(){if(!recognition.current||stopping)return;setStopping(true);try{recognition.current.stop();}catch{recognition.current.abort();}}
  if(!Speech)return <p className="helper-text">Voice input is unavailable in this browser. You can type instead.</p>;
- return <div className="voice-input"><div className="voice-controls"><div className="voice-language"><label htmlFor={languageId}>Language</label><InfoTip>Your browser may send audio to its speech recognition provider.</InfoTip><select id={languageId} value={language} disabled={listening||disabled} onChange={e=>setLanguage(e.target.value)}><option value="en-US">English</option><option value="zh-CN">中文</option></select></div><div className="voice-switch-row"><button className="voice-switch" role="switch" aria-checked={listening} aria-label="Voice input" type="button" disabled={disabled||stopping} onClick={listening?stop:start}><span className="voice-switch-thumb" aria-hidden="true"/></button><span className="voice-switch-label"><Mic className="button-icon" aria-hidden="true"/>{stopping?'Stopping…':listening?<span role="status">Listening<span className="listening-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></span>:'Start Voice'}</span></div></div>{interim && <p className="voice-interim" aria-live="polite">{interim}</p>}{notice && <p role="status">{notice}</p>}</div>;
+ const languageSelector=<div className="voice-language"><label htmlFor={languageId}>Language</label><InfoTip>Your browser may send audio to its speech recognition provider.</InfoTip><select id={languageId} value={language} disabled={listening||disabled} onChange={e=>setLanguage(e.target.value)}><option value="en-US">English</option><option value="zh-CN">中文</option></select></div>;
+ return <div className="voice-input"><div className="voice-controls">{languageSlot ? createPortal(languageSelector,languageSlot) : languageSelector}<div className="voice-switch-row"><button className="voice-switch" role="switch" aria-checked={listening} aria-label="Voice input" type="button" disabled={disabled||stopping} onClick={listening?stop:start}><span className="voice-switch-thumb" aria-hidden="true"/></button><span className="voice-switch-label"><Mic className="button-icon" aria-hidden="true"/>{stopping?'Stopping…':listening?<span role="status">Listening<span className="listening-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></span>:'Start Voice'}</span></div></div>{interim && <p className="voice-interim" aria-live="polite">{interim}</p>}{notice && <p role="status">{notice}</p>}</div>;
 }
