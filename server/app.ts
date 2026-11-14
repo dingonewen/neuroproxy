@@ -5,6 +5,7 @@ import { extractConversation, type Extractor } from './extract.ts';
 import { validateExtraction } from '../shared/extraction.ts';
 import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
 import { PhotonSender, type PhotonTarget } from './photon.ts';
+import { describeAnalysisError } from './analysis-error.ts';
 export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER})) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
@@ -46,7 +47,7 @@ app.post('/api/extract', async (req, reply) => {
   const input = (req.body as { text?: unknown } | null)?.text;
   if (typeof input !== 'string' || !input.trim() || input.length > 8000) return reply.code(400).send({ error: 'Enter text (maximum 8000 characters).' });
   try { return validateExtraction(await extractor(input.trim())); }
-  catch { return reply.code(502).send({ error: 'Analysis failed. Check NEUROPROXY_MODEL and provider credentials, then try again.' }); }
+  catch (error) { const diagnosis=describeAnalysisError(error); console.error(`Analysis failed: ${diagnosis.kind}`); return reply.code(502).send({ error: diagnosis.message, category:diagnosis.kind }); }
 });
 app.post('/api/reviewed-context', async (req) => store.createReviewed(req.body));
 app.post('/api/replies/:id/insights', async (req) => {store.addReplyInsights((req.params as {id:string}).id,req.body);return {ok:true};});
