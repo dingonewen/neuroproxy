@@ -1,9 +1,11 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { validateExtraction, relationshipSchema, type Extraction } from '../shared/extraction.ts';
 import type { PhotonMessage } from './photon-webhook.ts';
 import { groupGraph } from '../shared/graph-groups.ts';
 import { labelRealSms } from '../shared/sms.ts';
+
+const eventHash=(value:string)=>createHash('sha256').update(value).digest('hex');
 
 export class Store {
   db: DatabaseSync;
@@ -11,6 +13,7 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS nodes (id TEXT PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, status TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'user'); CREATE TABLE IF NOT EXISTS edges (id TEXT PRIMARY KEY, source TEXT NOT NULL REFERENCES nodes(id), target TEXT NOT NULL REFERENCES nodes(id), label TEXT NOT NULL); CREATE TABLE IF NOT EXISTS drafts (id TEXT PRIMARY KEY, person TEXT NOT NULL, body TEXT NOT NULL, state TEXT NOT NULL, person_id TEXT NOT NULL REFERENCES nodes(id), task_id TEXT NOT NULL REFERENCES nodes(id), message_id TEXT NOT NULL REFERENCES nodes(id));`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_inbox (event_id TEXT PRIMARY KEY, message_id TEXT NOT NULL UNIQUE, space_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, node_id TEXT NOT NULL REFERENCES nodes(id));`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS deleted_photon_events (event_hash TEXT PRIMARY KEY, message_hash TEXT NOT NULL UNIQUE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS imessage_sessions (node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, human_handle TEXT NOT NULL, agent_handle TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_dispatches (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), space_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, status TEXT NOT NULL, photon_message_id TEXT UNIQUE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_preparations (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), recipient_phone TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, approved_at TEXT NOT NULL);`);
@@ -93,20 +96,27 @@ export class Store {
       const graph=this.graph();
       const nodes=graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)}));
       const edges=graph.edges.map(e=>({source:String(e.source),target:String(e.target)}));
-      const group=groupGraph(nodes,edges).find(g=>g.id===topicId && g.id!=='unlinked');
+      const group=groupGraph(nodes,edges).find(g=>g.id===topicId);
       if(!group) throw Error('Conversation not found.');
       const ids=group.nodeIds;
-      if(nodes.filter(n=>ids.has(n.id)&&n.kind==='topic').length!==1) throw Error('This graph contains multiple connected topics and cannot be deleted as one conversation.');
+      if(nodes.filter(n=>ids.has(n.id)&&n.kind==='topic').length!==(topicId==='unlinked'?0:1)) throw Error('This graph contains multiple connected topics and cannot be deleted as one conversation.');
       const affected=graph.drafts.filter(d=>ids.has(String(d.person_id)) || ids.has(String(d.task_id)) || ids.has(String(d.message_id)));
       for(const draft of affected) {
         if(![draft.person_id,draft.task_id,draft.message_id].every(id=>ids.has(String(id)))) throw Error('This graph shares a delegation with another conversation and cannot be deleted.');
-        if(this.db.prepare('SELECT 1 FROM photon_dispatches WHERE draft_id=?').get(String(draft.id)) || this.db.prepare('SELECT 1 FROM photon_preparations WHERE draft_id=?').get(String(draft.id))) throw Error('This conversation has Photon activity and cannot be deleted while its messaging history is needed.');
+        if(draft.state==='preparing' || draft.state==='submitting') throw Error('A message is being sent. Wait for the send attempt to finish before deleting.');
       }
       for(const id of ids) {
-        if(this.db.prepare("SELECT 1 FROM nodes WHERE id=? AND source='photon'").get(id) || this.db.prepare('SELECT 1 FROM photon_inbox WHERE node_id=?').get(id)) throw Error('This conversation has Photon activity and cannot be deleted while its messaging history is needed.');
+        const incoming=this.db.prepare('SELECT event_id,message_id FROM photon_inbox WHERE node_id=?').get(id) as {event_id:string;message_id:string}|undefined;
+        if(incoming) this.db.prepare('INSERT OR IGNORE INTO deleted_photon_events VALUES (?,?)').run(eventHash(incoming.event_id),eventHash(incoming.message_id));
       }
       for(const id of ids) this.db.prepare('DELETE FROM edges WHERE source=? OR target=?').run(id,id);
-      for(const draft of affected) this.db.prepare('DELETE FROM drafts WHERE id=?').run(String(draft.id));
+      for(const id of ids) this.db.prepare('DELETE FROM photon_inbox WHERE node_id=?').run(id);
+      for(const draft of affected) {
+        this.db.prepare('DELETE FROM photon_dispatches WHERE draft_id=?').run(String(draft.id));
+        this.db.prepare('DELETE FROM photon_preparations WHERE draft_id=?').run(String(draft.id));
+        this.db.prepare('DELETE FROM photon_message_labels WHERE draft_id=?').run(String(draft.id));
+        this.db.prepare('DELETE FROM drafts WHERE id=?').run(String(draft.id));
+      }
       for(const id of ids) this.db.prepare('DELETE FROM nodes WHERE id=?').run(id);
       this.db.exec('COMMIT');
     } catch(error){this.db.exec('ROLLBACK');throw error;}
@@ -114,6 +124,8 @@ export class Store {
   receivePhoton(message: PhotonMessage): boolean {
     this.db.exec('BEGIN IMMEDIATE');
     try {
+      const deleted=this.db.prepare('SELECT 1 FROM deleted_photon_events WHERE event_hash=? OR message_hash=?').get(eventHash(message.eventId),eventHash(message.messageId));
+      if(deleted) {this.db.exec('COMMIT');return false;}
       const existing = this.db.prepare('SELECT 1 FROM photon_inbox WHERE event_id=? OR message_id=?').get(message.eventId, message.messageId);
       if (existing) { this.db.exec('COMMIT'); return false; }
       type Match = {id:string;task_id:string;person_id:string;message_id:string};

@@ -115,12 +115,12 @@ test('delete removes only the selected conversation and its local drafts',async(
  }finally{await app.close();store.close();}
 });
 
-test('deleting a conversation with Photon activity is blocked and keeps its history',async()=>{
+test('deleting a conversation is blocked while a Photon send is in progress',async()=>{
  const store=new Store(':memory:');const app=createApp(store);
  try {
   const created=(await app.inject({method:'POST',url:'/api/reviewed-context',payload:{topic:'Real',people:['A'],tasks:[{description:'Check',assignee:'A'}],uncertainties:[],draft:{recipient:'A',taskIndex:0,body:'Hello?'}}})).json();
   store.preparePhone(created.draftId,'+14155550123',labelRealSms('Hello?'));
-  const before=store.graph();const response=await app.inject({method:'DELETE',url:`/api/conversations/${created.topicId}`});assert.equal(response.statusCode,400);assert.match(response.json().error,/Photon activity/);assert.deepEqual(store.graph(),before);
+  const before=store.graph();const response=await app.inject({method:'DELETE',url:`/api/conversations/${created.topicId}`});assert.equal(response.statusCode,400);assert.match(response.json().error,/being sent/);assert.deepEqual(store.graph(),before);
  }finally{await app.close();store.close();}
 });
 
