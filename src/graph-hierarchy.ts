@@ -1,11 +1,11 @@
 type GraphNode = {id:string;kind:string;label:string;status:string;source:string};
 type GraphEdge = {id:string;source:string;target:string;label:string};
 const stages = [
- {key:'context',label:'Relationship context', kinds:[] as string[]},
- {key:'reported',label:'Reported context', kinds:['reported_fact','feeling','need']},
- {key:'interpret',label:'Possible interpretations', kinds:['interpretation']},
- {key:'question',label:'Core question', kinds:['core_question']},
- {key:'action',label:'Suggested next action', kinds:['suggested_action']},
+ {key:'context',label:'Relationship Context', kinds:[] as string[]},
+ {key:'reported',label:'Reported Context', kinds:['reported_fact','feeling','need']},
+ {key:'interpret',label:'Possible Interpretations', kinds:['interpretation']},
+ {key:'question',label:'Core Question', kinds:['core_question']},
+ {key:'action',label:'Suggested Next Action', kinds:['suggested_action']},
 ];
 /** Add visual-only groups; sequential headers indicate review order, not causation. */
 export function graphHierarchy<T extends {nodes:GraphNode[];edges:GraphEdge[]}>(graph:T): {nodes:GraphNode[];edges:GraphEdge[]} {
