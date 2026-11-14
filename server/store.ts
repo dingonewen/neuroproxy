@@ -71,13 +71,17 @@ export class Store {
         if (task.assignee) this.edge(people.get(task.assignee)!, id, 'assigned to');
         return id;
       });
-      for (const uncertainty of data.uncertainties) { const id = this.node('question', uncertainty, 'unresolved'); this.edge(topicId, id, 'unresolved'); }
+      for (const uncertainty of data.uncertainties) {
+        const id = this.node('question', uncertainty.question, 'unresolved');
+        if (uncertainty.people.length) for (const name of uncertainty.people) this.edge(people.get(name)!, id, 'question about');
+        else this.edge(topicId, id, 'unresolved');
+      }
       let draftId: string | null = null;
       if (data.draft) {
         const { recipient, body, taskIndex } = data.draft;
         const personId = people.get(recipient)!; const taskId = tasks[taskIndex!];
         const messageId = this.node('message', body, 'pending_approval', 'simulated');
-        this.edge(taskId, messageId, 'draft'); this.edge(messageId, personId, 'to');
+        this.edge(taskId, messageId, 'draft'); this.edge(personId, messageId, 'recipient');
         draftId = randomUUID();
         this.db.prepare('INSERT INTO drafts VALUES (?,?,?,?,?,?,?)').run(draftId, recipient, body, 'pending_approval', personId, taskId, messageId);
       }
@@ -89,7 +93,7 @@ export class Store {
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const topicId = this.node('topic', topic.trim()); const personId = this.node('person', person.trim()); const taskId = this.node('task', task.trim(), 'pending_approval'); const messageId = this.node('message', body.trim(), 'pending_approval', 'simulated');
-      this.edge(topicId, taskId, 'contains'); this.edge(personId, taskId, 'involved in'); this.edge(taskId, messageId, 'draft'); this.edge(messageId, personId, 'to');
+      this.edge(topicId, personId, 'involves'); this.edge(personId, taskId, 'involved in'); this.edge(taskId, messageId, 'draft'); this.edge(personId, messageId, 'recipient');
       const id = randomUUID(); this.db.prepare('INSERT INTO drafts VALUES (?,?,?,?,?,?,?)').run(id, person.trim(), body.trim(), 'pending_approval', personId, taskId, messageId); this.db.exec('COMMIT'); return id;
     } catch (e) { this.db.exec('ROLLBACK'); throw e; }
   }
