@@ -3,9 +3,29 @@ import { Store } from './store.ts';
 import { createAgent } from './agent.ts';
 import { extractConversation, type Extractor } from './extract.ts';
 import { validateExtraction } from '../shared/extraction.ts';
-export function createApp(store: Store, extractor: Extractor = extractConversation) {
+import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
+export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
+app.register(async (webhook) => {
+  webhook.removeContentTypeParser('application/json');
+  webhook.addContentTypeParser('application/json', { parseAs: 'buffer', bodyLimit: 65536 }, (_req, body, done) => done(null, body));
+  webhook.post('/api/webhooks/photon', async (req, reply) => {
+    if (!webhookConfig.secret || !webhookConfig.projectId) return reply.code(503).send({ error: 'Photon webhook is not configured.' });
+    if (!Buffer.isBuffer(req.body) || !verifyPhotonWebhook(req.body, req.headers, webhookConfig.secret)) return reply.code(401).send({ error: 'Invalid webhook signature.' });
+    let delivery: unknown;
+    try { delivery = JSON.parse(req.body.toString('utf8')); } catch { return reply.code(400).send({ error: 'Invalid webhook JSON.' }); }
+    if (!delivery || typeof delivery !== 'object' || typeof (delivery as {type?:unknown}).type !== 'string') return reply.code(400).send({ error: 'Invalid webhook event.' });
+    if ((delivery as {type:string}).type !== 'message.received') return reply.code(204).send();
+    const content = (delivery as {data?:{object?:{content?:{type?:unknown}}}}).data?.object?.content;
+    if (content && typeof content.type === 'string' && content.type !== 'text') return reply.code(204).send();
+    const message = parsePhotonMessage(delivery, webhookConfig.projectId);
+    if (!message) return reply.code(400).send({ error: 'Invalid message event.' });
+    try { store.receivePhoton(message); }
+    catch { return reply.code(503).send({ error: 'Unable to store webhook event.' }); }
+    return reply.code(204).send();
+  });
+});
 app.get('/api/graph', async () => store.graph());
 app.post('/api/extract', async (req, reply) => {
   const input = (req.body as { text?: unknown } | null)?.text;
