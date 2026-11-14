@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Extraction } from '../shared/extraction';
 
-export function ConversationInput({ onSaved }: { onSaved: () => Promise<void> }) {
+export function ConversationInput({ onSaved, onPreview }: { onSaved: (topicId:string) => Promise<void>; onPreview:(result:Extraction|null)=>void }) {
  const [text, setText] = useState('');
  const [result, setResult] = useState<Extraction | null>(null);
  const [busy, setBusy] = useState(false);
  const [error, setError] = useState('');
  const [saved, setSaved] = useState(false);
+ useEffect(()=>{onPreview(result);},[result,onPreview]);
  async function analyze() {
   setBusy(true); setError(''); setSaved(false); setResult(null);
   try {
@@ -21,12 +22,12 @@ export function ConversationInput({ onSaved }: { onSaved: () => Promise<void> })
    const res = await fetch('/api/reviewed-context', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(result) });
    const data = await res.json(); if (!res.ok) throw new Error(data.error);
    setResult(null); setSaved(true);
-   try { await onSaved(); } catch { setError('Saved, but the graph could not refresh. Reload the page.'); }
+   try { await onSaved(data.topicId); } catch { setError('Saved, but the graph could not refresh. Reload the page.'); }
   } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
  }
  return <section>
   <h2>Understand a conversation</h2>
-  <p>Describe the situation. Review the suggestions before saving them to the graph.</p>
+  <p>Analyze to preview the graph. Review and save the suggestions to keep them.</p>
   <label>Conversation<textarea maxLength={8000} disabled={busy} value={text} onChange={e=>{setText(e.target.value); setResult(null); setSaved(false);}} /></label>
   <button type="button" disabled={busy || !text.trim()} onClick={analyze}>{busy ? 'Working…' : 'Analyze conversation'}</button>
   {error && <p role="alert">{error}</p>}{saved && <p role="status">Saved to the graph. Any message draft still requires approval.</p>}

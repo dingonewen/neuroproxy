@@ -5,7 +5,7 @@ import { extractConversation, type Extractor } from './extract.ts';
 import { validateExtraction } from '../shared/extraction.ts';
 import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
 import { PhotonSender, type PhotonTarget } from './photon.ts';
-export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID})) {
+export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER})) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
 app.register(async (webhook) => {
@@ -28,6 +28,20 @@ app.register(async (webhook) => {
   });
 });
 app.get('/api/graph', async () => store.graph());
+app.delete('/api/conversations/:id', async req => {store.deleteConversation((req.params as {id:string}).id);return {ok:true};});
+app.get('/api/photon-inbox/:id/candidates', async req => ({candidates:store.photonCandidates((req.params as {id:string}).id)}));
+app.post('/api/photon-inbox/:id/link', async (req,reply) => {
+  const draftId=(req.body as {draftId?:unknown}|null)?.draftId;
+  if(typeof draftId!=='string') return reply.code(400).send({error:'Choose a delegation.'});
+  store.linkPhotonReply((req.params as {id:string}).id,draftId);
+  return {ok:true};
+});
+app.post('/api/photon-inbox/:id/review', async (req,reply) => {
+  const confirm=(req.body as {confirm?:unknown}|null)?.confirm;
+  if(typeof confirm!=='boolean') return reply.code(400).send({error:'Choose whether this message is a reply.'});
+  store.reviewPossibleReply((req.params as {id:string}).id,confirm);
+  return {ok:true};
+});
 app.post('/api/extract', async (req, reply) => {
   const input = (req.body as { text?: unknown } | null)?.text;
   if (typeof input !== 'string' || !input.trim() || input.length > 8000) return reply.code(400).send({ error: 'Enter text (maximum 8000 characters).' });
@@ -43,6 +57,19 @@ app.post('/api/ask', async (req) => {
   return { answer: result.text };
 });
 app.post('/api/drafts', async (req) => { const b = req.body as Record<string,string>; return { id: store.create(b.topic, b.person, b.task, b.body) }; });
+app.post('/api/drafts/:id/approve-photon-phone', async (req, reply) => {
+  const b=req.body as {recipientPhone?:unknown;approvedBody?:unknown;consent?:unknown}|null;
+  if(!b || b.consent!==true || typeof b.recipientPhone!=='string' || typeof b.approvedBody!=='string') return reply.code(400).send({error:'Confirm recipient consent and approve the exact draft.'});
+  const id=(req.params as {id:string}).id;
+  const reserved=store.preparePhone(id,b.recipientPhone.trim(),b.approvedBody);
+  let target: PhotonTarget;
+  try { target=await photon.resolvePhone(b.recipientPhone.trim(),reserved.key); }
+  catch { store.failPreparation(id); return reply.code(502).send({error:'Could not prepare the Photon SMS conversation. No SMS was sent; check number activation, API credentials, and E.164 numbers.'}); }
+  store.bindPreparedPhone(id,target,reserved.key);
+  const messageId=await photon.send(target,reserved.body,reserved.key);
+  store.finishPhoton(id,messageId);
+  return {status:messageId ? 'waiting_for_reply' : 'send_unknown'};
+});
 app.post('/api/drafts/:id/approve-photon', async (req, reply) => {
   const b = req.body as (PhotonTarget & {approvedBody?:unknown;consent?:unknown}) | null;
   if (!b || b.consent !== true || typeof b.approvedBody !== 'string' || typeof b.spaceId !== 'string' || typeof b.senderId !== 'string' || typeof b.recipientId !== 'string' || typeof b.recipientPhone !== 'string') return reply.code(400).send({error:'Confirm recipient consent and approve the exact draft.'});

@@ -56,3 +56,47 @@ test('manual draft creates a connected graph without a message-to-person cycle',
   assert.ok(graph.edges.some(e=>e.source===task?.id && e.target===message?.id)); assert.ok(!graph.edges.some(e=>e.source===message?.id && e.target===person?.id));
  } finally {await app.close();store.close();}
 });
+
+test('saving another conversation preserves prior graph and draft records', async () => {
+ const store=new Store(':memory:');const app=createApp(store);
+ const input=(topic:string,person:string)=>({topic,people:[person],tasks:[{description:'Check',assignee:person}],uncertainties:[],draft:{recipient:person,taskIndex:0,body:'Hello?'}});
+ try {
+  const first=await app.inject({method:'POST',url:'/api/reviewed-context',payload:input('First','Alex')});
+  const second=await app.inject({method:'POST',url:'/api/reviewed-context',payload:input('Second','Sam')});
+  assert.equal(first.statusCode,200);assert.equal(second.statusCode,200);
+  const graph=store.graph();assert.ok(graph.nodes.some(n=>n.id===first.json().topicId));assert.ok(graph.nodes.some(n=>n.id===second.json().topicId));
+  assert.equal(graph.drafts.length,2);assert.ok(graph.drafts.every(d=>d.state==='pending_approval'));
+ } finally {await app.close();store.close();}
+});
+
+test('delete removes only the selected conversation and its local drafts',async()=>{
+ const store=new Store(':memory:');const app=createApp(store);
+ const input=(topic:string,person:string)=>({topic,people:[person],tasks:[{description:'Check',assignee:person}],uncertainties:[],draft:{recipient:person,taskIndex:0,body:'Hello?'}});
+ try {
+  const one=(await app.inject({method:'POST',url:'/api/reviewed-context',payload:input('One','A')})).json();
+  const two=(await app.inject({method:'POST',url:'/api/reviewed-context',payload:input('Two','B')})).json();
+  const deleted=await app.inject({method:'DELETE',url:`/api/conversations/${one.topicId}`});assert.equal(deleted.statusCode,200);
+  const graph=store.graph();assert.ok(!graph.nodes.some(n=>n.id===one.topicId));assert.ok(graph.nodes.some(n=>n.id===two.topicId));assert.equal(graph.drafts.length,1);assert.equal(graph.drafts[0].id,two.draftId);
+  assert.equal((await app.inject({method:'DELETE',url:`/api/conversations/${one.topicId}`})).statusCode,400);
+ }finally{await app.close();store.close();}
+});
+
+test('deleting a conversation with Photon activity is blocked and keeps its history',async()=>{
+ const store=new Store(':memory:');const app=createApp(store);
+ try {
+  const created=(await app.inject({method:'POST',url:'/api/reviewed-context',payload:{topic:'Real',people:['A'],tasks:[{description:'Check',assignee:'A'}],uncertainties:[],draft:{recipient:'A',taskIndex:0,body:'Hello?'}}})).json();
+  store.preparePhone(created.draftId,'+14155550123','Hello?');
+  const before=store.graph();const response=await app.inject({method:'DELETE',url:`/api/conversations/${created.topicId}`});assert.equal(response.statusCode,400);assert.match(response.json().error,/Photon activity/);assert.deepEqual(store.graph(),before);
+ }finally{await app.close();store.close();}
+});
+
+test('delete refuses graphs that join multiple topics and leaves both intact',async()=>{
+ const store=new Store(':memory:');const app=createApp(store);
+ try {
+  const one=store.createReviewed({topic:'One',people:[],tasks:[],uncertainties:[],draft:null});
+  const two=store.createReviewed({topic:'Two',people:[],tasks:[],uncertainties:[],draft:null});
+  store.edge(one.topicId,two.topicId,'connected');const before=store.graph();
+  const response=await app.inject({method:'DELETE',url:`/api/conversations/${two.topicId}`});
+  assert.equal(response.statusCode,400);assert.match(response.json().error,/multiple connected topics/);assert.deepEqual(store.graph(),before);
+ }finally{await app.close();store.close();}
+});

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --env-file-if-exists=.env server/index.ts",
     "build": "vite build && tsc --noEmit",
-    "test": "node --test server/*.test.ts",
+    "test": "node --test server/*.test.ts src/*.test.ts",
     "dev:web": "vite --host 127.0.0.1",
     "check:photon": "node --env-file-if-exists=.env scripts/check-photon.ts"
   },

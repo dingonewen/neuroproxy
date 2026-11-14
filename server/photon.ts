@@ -3,7 +3,7 @@
  */
 export type PhotonCheck = { ok: true } | { ok: false; reason: 'missing_config' | 'invalid_config' | 'unauthorized' | 'forbidden' | 'http_error' | 'network_error' | 'invalid_response'; status?: number };
 
-type PhotonConfig = { apiKey?: string; projectId?: string };
+type PhotonConfig = { apiKey?: string; projectId?: string; smsNumber?: string };
 export async function checkPhoton(config: PhotonConfig, request: typeof fetch = fetch): Promise<PhotonCheck> {
  const key = config.apiKey?.trim(); const project = config.projectId?.trim();
  if (!key || !project) return { ok:false, reason:'missing_config' };
@@ -31,6 +31,23 @@ export class PhotonSender {
   const project=this.config.projectId?.trim(); const key=this.config.apiKey?.trim();
   if (!key || !project || !/^pho_prj_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(project) || /[\r\n]/.test(key)) throw Error('Photon credentials or project ID are not configured.');
   return {url:`https://api.photon.codes/v1/projects/${project}`,key,project};
+ }
+ async resolvePhone(recipientPhone:string, idempotencyKey:string):Promise<PhotonTarget> {
+  const senderPhone=this.config.smsNumber?.trim();
+  if (!senderPhone || !/^\+[1-9]\d{7,14}$/.test(senderPhone) || !/^\+[1-9]\d{7,14}$/.test(recipientPhone) || senderPhone===recipientPhone) throw Error('Configure a valid Photon SMS number and a different recipient number in E.164 format.');
+  const {url,key,project}=this.base();
+  const post=async(path:string,body:object,suffix:string) => {
+   const res=await this.request(url+path,{method:'POST',headers:{Authorization:`Bearer ${key}`,'content-type':'application/json','idempotency-key':`${idempotencyKey}-${suffix}`},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(10000)});
+   if(!res.ok) throw Error('Photon could not prepare the SMS conversation.');
+   return await res.json() as Record<string,unknown>;
+  };
+  const own=await post('/users',{platform:'sms',handle:senderPhone},'sender');
+  if(own.projectId!==project || own.platform!=='sms' || own.kind!=='agent' || own.handle!==senderPhone || typeof own.id!=='string' || !entityId(own.id,'usr')) throw Error('Photon SMS number is not available as an agent.');
+  const other=await post('/users',{platform:'sms',handle:recipientPhone},'recipient');
+  if(other.projectId!==project || other.platform!=='sms' || other.kind!=='human' || other.handle!==recipientPhone || typeof other.id!=='string' || !entityId(other.id,'usr') || other.id===own.id) throw Error('Photon recipient could not be verified.');
+  const space=await post('/spaces',{platform:'sms',participantIds:[own.id,other.id]},'space');
+  if(space.projectId!==project || space.platform!=='sms' || space.kind!=='direct' || typeof space.id!=='string' || !entityId(space.id,'spc') || !Array.isArray(space.participantIds) || space.participantIds.length!==2 || !space.participantIds.includes(own.id) || !space.participantIds.includes(other.id)) throw Error('Photon conversation could not be verified.');
+  return {spaceId:space.id,senderId:own.id,recipientId:other.id,recipientPhone};
  }
  async verifyTarget(target:PhotonTarget) {
   if (!entityId(target.spaceId,'spc') || !entityId(target.senderId,'usr') || !entityId(target.recipientId,'usr') || target.senderId===target.recipientId || !/^\+[1-9]\d{7,14}$/.test(target.recipientPhone)) throw Error('Enter valid Photon IDs and an E.164 recipient phone number.');
