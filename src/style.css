@@ -131,3 +131,81 @@ section.conversation-panel,section.delegation-panel,section.graph,.recovery-pane
 
 /* Keep long saved-context text secondary to its label. */
 .saved-node>div:not(.saved-node-label),.node-detail-content{font-size:.9rem;font-weight:400;line-height:1.55}
+
+
+/* The five work areas follow the user's dashboard sketch. */
+main{display:grid;grid-template-columns:minmax(245px,1fr) minmax(245px,1.08fr) minmax(400px,2.3fr);grid-template-rows:auto minmax(260px,auto) minmax(430px,auto);gap:20px 22px;align-items:stretch}
+.app-header,.columns,.columns>div{display:contents}
+.brand{grid-column:2;grid-row:2;min-width:0;min-height:0;margin:0}
+.recovery-panel{grid-column:1 / 3;grid-row:1;min-width:0}
+.conversation-panel{grid-column:3;grid-row:1 / 3;min-width:0}
+.delegation-panel{grid-column:1;grid-row:2 / 4;min-width:0}
+.graph{grid-column:2 / 4;grid-row:3;position:static;min-width:0}
+.graph>h2{margin:12px 0}
+.graph .canvas{height:55vh;min-height:380px}
+@media(max-width:1050px){main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto;gap:18px}.brand{grid-column:1;grid-row:1}.recovery-panel{grid-column:2;grid-row:1}.conversation-panel{grid-column:1 / -1;grid-row:2}.graph{grid-column:1 / -1;grid-row:3}.delegation-panel{grid-column:1 / -1;grid-row:4}}
+@media(max-width:620px){main{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}.brand,.recovery-panel,.conversation-panel,.graph,.delegation-panel{grid-column:1}.brand{grid-row:1}.conversation-panel{grid-row:2}.graph{grid-row:3}.delegation-panel{grid-row:4}.recovery-panel{grid-row:5}.graph .canvas{height:55vh;min-height:320px}}
+
+/* A compact desktop review area; mobile keeps a natural reading flow. */
+.conversation-panel{container-type:inline-size}
+.conversation-panel .review,.conversation-panel .saved-context{min-width:0}
+.saved-relationship-grid{display:grid;gap:8px}
+.saved-relationship-group{min-width:0}.saved-relationship-group h5{margin:8px 0 4px}
+@container (min-width:520px){
+ .conversation-panel .topic-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+ .conversation-panel .topic-card>.topic-title,.conversation-panel .topic-card> .saved-node:first-child{grid-column:1/-1}
+ .conversation-panel .topic-card>.category-card{margin-top:0;min-width:0}
+ .conversation-panel .topic-card>.relationship-card,.conversation-panel .topic-card>.saved-relationship-card{grid-column:1/-1}
+ .conversation-panel .relationship-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start}
+ .conversation-panel .relationship-card>.category-heading{grid-column:1/-1}
+ .conversation-panel .relationship-card>.relationship-group{margin-top:0;min-width:0}
+ .conversation-panel .relationship-card>.text-button{grid-column:1/-1;justify-self:start}
+ .saved-relationship-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(min-width:1051px){
+ .conversation-panel .review,.conversation-panel .saved-context{max-height:480px;overflow:auto;overscroll-behavior:contain;padding-right:8px;scrollbar-gutter:stable}
+ .conversation-panel .review-actions{position:sticky;bottom:0;z-index:2;background:hsl(var(--card));padding:10px 0;margin-top:0}
+}
+@media(max-width:620px){
+ .conversation-panel .review,.conversation-panel .saved-context{max-height:none;overflow:visible;padding-right:0}
+ .conversation-panel .topic-card{display:block}.conversation-panel .topic-card>.category-card{margin-top:10px}
+ .conversation-panel .relationship-card,.saved-relationship-grid{display:block}
+ .conversation-panel .conversation-textarea{min-height:115px}
+}
+
+/* Fill the desktop work areas while keeping recovery and message history compact. */
+@media(min-width:1051px){
+ main{grid-template-rows:auto minmax(240px,auto) minmax(600px,1fr)}
+ .recovery-panel{padding:14px 18px}
+ .recovery-panel h2{margin:3px 0}.recovery-panel>p{margin:3px 0}
+ .recovery-panel form{display:grid;grid-template-columns:minmax(100px,1fr) auto;column-gap:12px;align-items:end}
+ .recovery-panel form>label{grid-column:1;margin:5px 0 3px}
+ .recovery-panel .recovery-input{grid-column:1;min-width:0}
+ .recovery-panel .recovery-voice-actions{grid-column:2;grid-row:1 / 3;margin:0;gap:10px}
+ .recovery-panel .recovery-voice-actions .voice-controls{flex-direction:row;align-items:end}
+ .conversation-panel{display:flex;flex-direction:column}
+ .conversation-panel>label{display:flex;flex-direction:column;flex:1;min-height:130px}
+ .conversation-panel .conversation-textarea{flex:1;min-height:100px;width:100%}
+ .conversation-panel .review,.conversation-panel .saved-context{flex:1;min-height:0}
+ .graph{display:flex;flex-direction:column}
+ .graph .canvas{flex:1;min-height:480px;height:auto}
+ .delegation-messages{max-height:65vh;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+}
+.chat-message{max-width:95%}
+@media(max-width:1050px){.delegation-messages{max-height:none;overflow:visible}}
+
+/* Desktop proportions: a shallow recovery row, a horizontal review panel and a large graph. */
+.conversation-textarea{resize:none}
+@media(min-width:1051px){
+ main{grid-template-columns:minmax(245px,1fr) minmax(245px,1.08fr) minmax(400px,2.3fr);grid-template-rows:minmax(195px,auto) minmax(260px,33vh) minmax(420px,50vh)}
+ .recovery-panel form{display:block}
+ .recovery-panel form>label{margin:5px 0 3px}
+ .recovery-panel .recovery-voice-actions{display:flex;justify-content:space-between;align-items:end;margin-top:8px;gap:12px}
+ .recovery-panel .recovery-voice-actions .voice-controls{flex-direction:column;align-items:flex-start}
+ .conversation-panel{min-height:0;overflow:hidden}
+ .conversation-panel>label{display:block;flex:none;min-height:0;margin:8px 0}
+ .conversation-panel .conversation-textarea{display:block;flex:none;width:100%;height:72px;min-height:72px;max-height:72px;resize:none}
+ .conversation-panel .review,.conversation-panel .saved-context{flex:1 1 0;min-height:0;max-height:none;overflow:auto}
+ .graph{min-height:0}
+ .graph .canvas{min-height:280px}
+}

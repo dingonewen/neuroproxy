@@ -25,7 +25,10 @@ export function SavedContext({nodes,onRefresh,navigation}:{nodes:ContextNode[];o
  const sections=[...groups,{label:'Other Context',kinds:[...new Set(nodes.filter(n=>!known.has(n.kind)).map(n=>n.kind))]}];
  return <div className="saved-context"><div className="review-heading"><h3>Saved Context</h3><InfoTip>Use Revisit to correct saved context.</InfoTip><p className="saved-context-subtitle">Conversation Details</p></div>
   <div className="topic-card">{topic?<SavedNode key={topic.id} node={topic} title="Topic" onRefresh={onRefresh} selected={selectedId===topic.id} onSelect={()=>setSelectedId(topic.id)}/>:<strong>Unlinked Messages</strong>}
-   {sections.map(group=>{const members=nodes.filter(n=>group.kinds.includes(n.kind));if(!members.length)return null;return <div className="category-card" id={group.label==='Relationship Context'?'context-relationship-section':undefined} key={group.label}><div className="category-heading"><h4>{group.label}</h4><span>{members.length}</span></div>{members.map((node,i)=><SavedNode key={node.id} node={node} title={`${names[node.kind] ?? node.kind.replaceAll('_',' ')} ${i+1}`} onRefresh={onRefresh} selected={selectedId===node.id} onSelect={()=>setSelectedId(node.id)}/>)}</div>;})}
+   {sections.map(group=>{const members=nodes.filter(n=>group.kinds.includes(n.kind));if(!members.length)return null;
+    const relationship=group.label==='Relationship Context';
+    const renderNode=(node:ContextNode,i:number)=><SavedNode key={node.id} node={node} title={`${names[node.kind] ?? node.kind.replaceAll('_',' ')} ${i+1}`} onRefresh={onRefresh} selected={selectedId===node.id} onSelect={()=>setSelectedId(node.id)}/>;
+    return <div className={`category-card${relationship?' saved-relationship-card':''}`} id={relationship?'context-relationship-section':undefined} key={group.label}><div className="category-heading"><h4>{group.label}</h4><span>{members.length}</span></div>{relationship ? <div className="saved-relationship-grid">{group.kinds.map(kind=>{const items=members.filter(node=>node.kind===kind);return items.length ? <div className="saved-relationship-group" key={kind}><h5>{names[kind]}</h5>{items.map(renderNode)}</div> : null;})}</div> : members.map(renderNode)}</div>;})}
   </div>
  </div>;
 }
