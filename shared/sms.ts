@@ -1,13 +1,14 @@
 export const NEUROPROXY_LABEL = '— Sent with assistance from NeuroProxy';
-export const DEFAULT_CUSTOM_LABEL = '— via NeuroProxy';
+export const DEFAULT_CUSTOM_LABEL = '↳ with help from NeuroProxy';
 
 export function validMessageLabel(label:unknown): label is string {
-  return typeof label==='string' && label.trim().length>0 && label.length<=120 && /neuroproxy/i.test(label);
+  return typeof label==='string' && label.length<=120;
 }
 
 export function labelRealSms(body: string, label = NEUROPROXY_LABEL): string {
-  if(!validMessageLabel(label)) throw new Error('The label must include NeuroProxy and be at most 120 characters.');
+  if(!validMessageLabel(label)) throw new Error('The signature must be at most 120 characters.');
   const trimmed = body.trimEnd();
   const suffix=label.trim();
+  if(!suffix) return trimmed;
   return trimmed.endsWith(suffix) ? trimmed : `${trimmed}\n\n${suffix}`;
 }

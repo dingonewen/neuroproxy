@@ -100,3 +100,14 @@ test('conversation to approved SMS to signed webhook and confirmed graph update'
   assert.equal(store.graph().drafts.find(d=>d.id===id)?.state,'reply_received');
  } finally {await app.close();store.close();}
 });
+
+test('an empty signature is supported and remains empty on retry',()=>{
+ const store=new Store(':memory:');try {
+  const id=store.create('Project','Alex','Check','Hello');bindTestContact(store,id);
+  assert.equal(labelRealSms('Hello',''),'Hello');assert.equal(labelRealSms('Hello','— A friend'),'Hello\n\n— A friend');
+  store.preparePhone(id,phone,'Hello','');store.failPreparation(id);
+  assert.equal(store.graph().drafts[0].message_label,'');
+  assert.throws(()=>store.preparePhone(id,phone,labelRealSms('Hello','Changed'),'Changed'),/previously approved label/);
+  assert.equal(store.preparePhone(id,phone,'Hello','').body,'Hello');
+ }finally{store.close();}
+});

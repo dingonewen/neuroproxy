@@ -61,7 +61,7 @@ export class Store {
       if (labelRealSms(draft.body,label)!==approvedBody) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       if (draft.state==='preparation_failed') this.db.prepare('DELETE FROM photon_preparations WHERE draft_id=?').run(id);
       const key=randomUUID();
-      if(label) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);
+      if(label!==undefined) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);
       this.db.prepare('INSERT INTO photon_preparations VALUES (?,?,?,?)').run(id,phone,key,new Date().toISOString());
       this.db.prepare("UPDATE drafts SET state='preparing', body=? WHERE id=?").run(approvedBody,id);
       this.db.prepare("UPDATE nodes SET status='preparing' WHERE id=?").run(draft.task_id);
@@ -221,7 +221,7 @@ export class Store {
       this.requireContact(draft.person_id,trackingHandle);
       if (approvedBody !== labelRealSms(draft.body,label)) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       const key = randomUUID();
-      if(label) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);
+      if(label!==undefined) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);
       if(trackingHandle) this.db.prepare('INSERT INTO photon_preparations VALUES (?,?,?,?)').run(id,trackingHandle,key,new Date().toISOString());
       this.db.prepare('INSERT INTO photon_dispatches VALUES (?,?,?,?,?,?,NULL)').run(id,spaceId,senderId,recipientId,key,'submitting');
       this.db.prepare("UPDATE drafts SET state='submitting', body=? WHERE id=?").run(approvedBody,id);
@@ -294,6 +294,50 @@ export class Store {
       r.facts.forEach(v=>add('reported_fact',v,'reported'));r.feelings.forEach(v=>add('feeling',v,'expressed feeling'));r.needs.forEach(v=>add('need',v,'expressed need'));r.interpretations.forEach(v=>add('interpretation',v,'possible interpretation'));add('core_question',r.coreQuestion,'core question');add('suggested_action',r.nextAction,'suggested action');
       this.db.exec('COMMIT');
     } catch(error) {this.db.exec('ROLLBACK');throw error;}
+  }
+  createReplyDraft(replyId:string, body:unknown, action:unknown) {
+    if(typeof body!=='string' || !body.trim() || body.length>2000 || typeof action!=='string' || !action.trim() || action.length>500) throw Error('Enter a reply and action.');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const previous=this.db.prepare("SELECT d.person,d.person_id FROM nodes n JOIN edges e ON e.target=n.id AND e.label='reply' JOIN drafts d ON d.message_id=e.source WHERE n.id=? AND n.kind='reply' AND n.status='received' AND d.state='reply_received'").get(replyId) as {person:string;person_id:string}|undefined;
+      if(!previous) throw Error('Confirm and link the reply before creating a draft.');
+      if(this.db.prepare("SELECT 1 FROM edges e JOIN nodes n ON n.id=e.target WHERE e.source=? AND e.label='follow-up' AND n.kind='task'").get(replyId)) throw Error('A follow-up draft has already been created for this reply.');
+      const taskId=this.node('task',action.trim(),'pending_approval');const messageId=this.node('message',body.trim(),'pending_approval','simulated');
+      this.edge(replyId,taskId,'follow-up');this.edge(taskId,messageId,'draft');this.edge(previous.person_id,messageId,'recipient');
+      const id=randomUUID();this.db.prepare('INSERT INTO drafts VALUES (?,?,?,?,?,?,?)').run(id,previous.person,body.trim(),'pending_approval',previous.person_id,taskId,messageId);
+      this.db.exec('COMMIT');return {id};
+    } catch(error) {this.db.exec('ROLLBACK');throw error;}
+  }
+  delegationContext(topicId:string, personId:unknown, newPerson:unknown, actionId:unknown, customAction:unknown) {
+    const graph=this.graph();
+    const group=groupGraph(graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)})),graph.edges.map(e=>({source:String(e.source),target:String(e.target)}))).find(g=>g.id===topicId && g.id!=='unlinked');
+    if(!group) throw Error('Choose a saved conversation.');
+    const nodes=graph.nodes.filter(n=>group.nodeIds.has(String(n.id)));
+    const selected=typeof personId==='string' && personId ? nodes.find(n=>n.id===personId && n.kind==='person') : undefined;
+    if(personId && !selected) throw Error('Choose a person in this conversation.');
+    const person=selected ? String(selected.label) : typeof newPerson==='string' ? newPerson.trim() : '';
+    if(!person || person.length>100) throw Error('Choose or add a person.');
+    if(!selected && nodes.some(n=>n.kind==='person' && String(n.label).toLocaleLowerCase()===person.toLocaleLowerCase())) throw Error('Choose the existing person with that name.');
+    const selectedAction=typeof actionId==='string' && actionId ? nodes.find(n=>n.id===actionId && (n.kind==='task'||n.kind==='suggested_action')) : undefined;
+    if(actionId && !selectedAction) throw Error('Choose an action in this conversation.');
+    const action=selectedAction ? String(selectedAction.label) : typeof customAction==='string' ? customAction.trim() : '';
+    if(!action || action.length>500) throw Error('Choose or enter an action.');
+    return {person,personId:selected ? String(selected.id) : null,action,actionId:selectedAction ? String(selectedAction.id) : null,nodes};
+  }
+  createConversationDraft(topicId:string, input:{personId?:unknown;newPerson?:unknown;actionId?:unknown;customAction?:unknown;body?:unknown}) {
+    if(typeof input.body!=='string'||!input.body.trim()||input.body.length>2000) throw Error('Enter a message draft (maximum 2000 characters).');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const context=this.delegationContext(topicId,input.personId,input.newPerson,input.actionId,input.customAction);
+      let personId=context.personId;
+      if(!personId){personId=this.node('person',context.person);this.edge(topicId,personId,'involves');}
+      const taskId=this.node('task',context.action,'pending_approval');
+      this.edge(context.actionId ?? personId,taskId,'delegation');
+      const messageId=this.node('message',input.body.trim(),'pending_approval','simulated');
+      this.edge(taskId,messageId,'draft');this.edge(personId,messageId,'recipient');
+      const id=randomUUID();this.db.prepare('INSERT INTO drafts VALUES (?,?,?,?,?,?,?)').run(id,context.person,input.body.trim(),'pending_approval',personId,taskId,messageId);
+      this.db.exec('COMMIT');return {id};
+    } catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   create(topic: string, person: string, task: string, body: string) {
     if (![topic, person, task, body].every(x => typeof x === 'string' && x.trim().length > 0 && x.length <= 2000)) throw new Error('Complete each field (maximum 2000 characters).');

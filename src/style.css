@@ -17,3 +17,4 @@ fieldset.review{border:0;border-top:1px solid #ddddeb;padding:12px 0 0;margin:20
 .contact-picker input::placeholder{color:#8b8494;opacity:1}.contact-format-help{display:block;margin-top:4px;color:#71647f;font-size:.75rem;font-weight:400;line-height:1.4}
 
 .contact-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}.contact-actions button,.channel-button{padding:6px 10px;font-size:.78rem;font-weight:650;line-height:1.3}.contact-actions .text-button{padding:6px 10px}.channel-buttons{justify-content:flex-end}
+.draft-suggestion-notice{color:#76618e;font-size:.8rem;font-style:italic;line-height:1.5}.draft-suggestion-notice strong{font-style:normal;font-weight:700}

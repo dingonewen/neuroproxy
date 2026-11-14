@@ -6,7 +6,8 @@ import { validateExtraction } from '../shared/extraction.ts';
 import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
 import { PhotonSender, type PhotonTarget } from './photon.ts';
 import { analysisErrorFingerprint, describeAnalysisError } from './analysis-error.ts';
-export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER})) {
+import { generateManualMessage, type ManualMessageGenerator } from './manual-message.ts';
+export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
 app.register(async (webhook) => {
@@ -57,6 +58,7 @@ app.post('/api/extract', async (req, reply) => {
 });
 app.post('/api/reviewed-context', async (req) => store.createReviewed(req.body));
 app.post('/api/replies/:id/insights', async (req) => {store.addReplyInsights((req.params as {id:string}).id,req.body);return {ok:true};});
+app.post('/api/replies/:id/draft', async req => {const b=req.body as {body?:unknown;action?:unknown}|null;return store.createReplyDraft((req.params as {id:string}).id,b?.body,b?.action);});
 app.post('/api/ask', async (req) => {
   const question = (req.body as {question?:unknown})?.question;
   if (typeof question !== 'string' || !question.trim() || question.length > 2000) throw new Error('Enter a question (maximum 2000 characters).');
@@ -65,6 +67,14 @@ app.post('/api/ask', async (req) => {
   return { answer: result.text };
 });
 app.post('/api/drafts', async (req) => { const b = req.body as Record<string,string>; return { id: store.create(b.topic, b.person, b.task, b.body) }; });
+app.post('/api/conversations/:id/delegation-suggestion', async (req,reply) => {
+  const id=(req.params as {id:string}).id;const b=req.body as {personId?:unknown;newPerson?:unknown;actionId?:unknown;customAction?:unknown}|null;
+  const context=store.delegationContext(id,b?.personId,b?.newPerson,b?.actionId,b?.customAction);
+  const data=context.nodes.filter(n=>['topic','person','task','question','reported_fact','feeling','need','interpretation','core_question','suggested_action','message','reply'].includes(String(n.kind))).slice(-30).map(n=>({kind:String(n.kind),text:String(n.label).slice(0,500)}));
+  try {return await manualMessage({person:context.person,action:context.action,conversation:data});}
+  catch(error){const diagnosis=describeAnalysisError(error);const fingerprint=analysisErrorFingerprint(error);console.error(`Message generation failed: ${diagnosis.kind} (${fingerprint})`);return reply.code(502).send({error:diagnosis.message,category:diagnosis.kind});}
+});
+app.post('/api/conversations/:id/drafts', async req => {const b=req.body as {personId?:unknown;newPerson?:unknown;actionId?:unknown;customAction?:unknown;body?:unknown}|null;return store.createConversationDraft((req.params as {id:string}).id,b??{});});
 app.post('/api/drafts/:id/approve-photon-phone', async (req, reply) => {
   const b=req.body as {recipientPhone?:unknown;approvedBody?:unknown;consent?:unknown;label?:unknown}|null;
   if(!b || b.consent!==true || typeof b.recipientPhone!=='string' || typeof b.approvedBody!=='string' || (b.label!==undefined && typeof b.label!=='string')) return reply.code(400).send({error:'Confirm recipient consent and approve the exact draft.'});

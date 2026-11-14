@@ -135,3 +135,41 @@ test('delete refuses graphs that join multiple topics and leaves both intact',as
   assert.equal(response.statusCode,400);assert.match(response.json().error,/multiple connected topics/);assert.deepEqual(store.graph(),before);
  }finally{await app.close();store.close();}
 });
+
+test('confirmed replies can produce one follow-up draft on the same person and conversation', async () => {
+ const store=new Store(':memory:');const app=createApp(store);
+ try {
+  const id=store.create('Connection','Alex','Ask','How are you?');
+  store.transition(id,'waiting_for_reply');store.reply(id,'Doing well','simulated');
+  let graph=store.graph();const reply=graph.nodes.find(n=>n.kind==='reply')!;
+  const request=()=>app.inject({method:'POST',url:`/api/replies/${reply.id}/draft`,payload:{action:'Continue the conversation',body:'Glad to hear it!'}});
+  const created=await request();assert.equal(created.statusCode,200);
+  assert.equal((await request()).statusCode,400);
+  graph=store.graph();const draft=graph.drafts.find(d=>d.id===created.json().id)!;const original=graph.drafts.find(d=>d.id===id)!;
+  assert.equal(draft.person_id,original.person_id);assert.equal(draft.state,'pending_approval');
+  assert.ok(graph.edges.some(e=>e.source===reply.id && e.target===draft.task_id && e.label==='follow-up'));
+  store.transition(String(draft.id),'waiting_for_reply');store.reply(String(draft.id),'Thanks!','simulated');
+  const next=store.graph().nodes.find(n=>n.label==='Thanks!')!;
+  assert.equal((await app.inject({method:'POST',url:`/api/replies/${next.id}/draft`,payload:{action:'Respond',body:'You are welcome.'}})).statusCode,200);
+  assert.equal((await app.inject({method:'POST',url:'/api/replies/missing/draft',payload:{action:'Respond',body:'Hello'}})).statusCode,400);
+ }finally{await app.close();store.close();}
+});
+
+test('manual delegation stays in the chosen conversation and reuses the selected person', async () => {
+ const store=new Store(':memory:');let modelInput='';
+ const app=createApp(store,undefined,undefined,undefined,async input=>{modelInput=JSON.stringify(input);return {body:'Can we talk honestly?',reason:null};});
+ try {
+  const first=store.createReviewed({topic:'Friendship',people:['Alex'],tasks:[{description:'Ask directly',assignee:'Alex'}],uncertainties:[],draft:null});
+  const second=store.createReviewed({topic:'Other',people:['Sam'],tasks:[],uncertainties:[],draft:null});
+  const graph=store.graph();const alex=graph.nodes.find(n=>n.kind==='person'&&n.label==='Alex')!;const sam=graph.nodes.find(n=>n.kind==='person'&&n.label==='Sam')!;const task=graph.nodes.find(n=>n.kind==='task'&&n.label==='Ask directly')!;
+  const selection={personId:alex.id,actionId:task.id};
+  let res=await app.inject({method:'POST',url:`/api/conversations/${first.topicId}/delegation-suggestion`,payload:selection});
+  assert.equal(res.statusCode,200);assert.equal(res.json().body,'Can we talk honestly?');assert.match(modelInput,/Friendship/);assert.doesNotMatch(modelInput,/Other/);assert.equal(store.graph().drafts.length,0);
+  res=await app.inject({method:'POST',url:`/api/conversations/${first.topicId}/drafts`,payload:{...selection,body:'Can we talk honestly?'}});assert.equal(res.statusCode,200);
+  const draft=store.graph().drafts.find(d=>d.id===res.json().id)!;assert.equal(draft.person_id,alex.id);assert.equal(draft.state,'pending_approval');assert.ok(store.graph().edges.some(e=>e.source===task.id&&e.target===draft.task_id));
+  assert.equal((await app.inject({method:'POST',url:`/api/conversations/${first.topicId}/drafts`,payload:{personId:sam.id,actionId:task.id,body:'Wrong person'}})).statusCode,400);
+  assert.equal((await app.inject({method:'POST',url:`/api/conversations/${second.topicId}/drafts`,payload:{personId:alex.id,actionId:task.id,body:'Wrong conversation'}})).statusCode,400);
+  const added=await app.inject({method:'POST',url:`/api/conversations/${first.topicId}/drafts`,payload:{newPerson:'Taylor',customAction:'Check in',body:'How are you?'}});assert.equal(added.statusCode,200);
+  const taylor=store.graph().nodes.find(n=>n.kind==='person'&&n.label==='Taylor')!;assert.ok(store.graph().edges.some(e=>e.source===first.topicId&&e.target===taylor.id));
+ }finally{await app.close();store.close();}
+});
