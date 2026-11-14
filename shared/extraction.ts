@@ -23,6 +23,14 @@ export class ExtractionValidationError extends Error {
   constructor(message:string) { super(message); this.name='ExtractionValidationError'; }
 }
 
+/** Repair only unambiguous model-generated references; never guess an assignee. */
+export function normalizeModelExtraction(value:unknown):Extraction {
+  const result=extractionSchema.parse(value);
+  const resolve=(name:string)=>result.people.find(person=>person.toLocaleLowerCase()===name.toLocaleLowerCase()) ?? '';
+  result.tasks=result.tasks.map(task=>({...task,assignee:resolve(task.assignee)}));
+  return validateExtraction(result);
+}
+
 export function validateExtraction(value: unknown): Extraction {
   const result = extractionSchema.parse(value);
   if (result.draft) {

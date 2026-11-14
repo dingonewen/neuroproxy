@@ -1,3 +1,4 @@
+import { traceAnalysis } from './telemetry.ts';
 import { filterInsights, initialInsights } from './insight-filter.ts';
 import Fastify from 'fastify';
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -7,7 +8,7 @@ import { extractConversation, type Extractor } from './extract.ts';
 import { validateExtraction } from '../shared/extraction.ts';
 import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
 import { PhotonSender, type PhotonTarget } from './photon.ts';
-import { analysisErrorFingerprint, describeAnalysisError } from './analysis-error.ts';
+import { analysisErrorFingerprint, describeAnalysisError, safeValidationDetails } from './analysis-error.ts';
 import { generateManualMessage, type ManualMessageGenerator } from './manual-message.ts';
 import { analyzeReply, replyAnalysisSchema, type ReplyAnalyzer } from './reply-analysis.ts';
 import { elevenLabsAgentStatus } from './elevenlabs.ts';
@@ -63,8 +64,8 @@ app.post('/api/photon-inbox/:id/review', async (req,reply) => {
 app.post('/api/extract', async (req, reply) => {
   const input = (req.body as { text?: unknown } | null)?.text;
   if (typeof input !== 'string' || !input.trim() || input.length > 8000) return reply.code(400).send({ error: 'Enter text (maximum 8000 characters).' });
-  try { return initialInsights(validateExtraction(await extractor(input.trim()))); }
-  catch (error) { const diagnosis=describeAnalysisError(error); const fingerprint=analysisErrorFingerprint(error); console.error(`Analysis failed: ${diagnosis.kind} (${fingerprint})`); return reply.code(502).send({ error: diagnosis.kind==='unknown' ? `${diagnosis.message} Diagnostic: ${fingerprint}.` : diagnosis.message, category:diagnosis.kind }); }
+  try { return initialInsights(validateExtraction(await traceAnalysis('conversation_analysis',()=>extractor(input.trim())))); }
+  catch (error) { const diagnosis=describeAnalysisError(error); const fingerprint=analysisErrorFingerprint(error); console.error(`Analysis failed: ${diagnosis.kind} (${fingerprint})${diagnosis.kind==='invalid_output' ? ` [${safeValidationDetails(error)}]` : ''}`); return reply.code(502).send({ error: diagnosis.kind==='unknown' ? `${diagnosis.message} Diagnostic: ${fingerprint}.` : diagnosis.message, category:diagnosis.kind }); }
 });
 app.post('/api/reviewed-context', async (req) => store.createReviewed(req.body));
 // Only expose this specific route to the voice provider. It cannot read existing
@@ -82,16 +83,16 @@ app.post('/api/voice/capture', async (req,reply) => {
   const existing=store.voiceCapture(b.conversationId);
   if(existing) return existing.summary?existing:reply.code(409).send({error:'This call was previously deleted.'});
   try {
-    const analysis=initialInsights(validateExtraction(await extractor(b.text.trim())));
+    const voiceText=b.text.trim();const analysis=initialInsights(validateExtraction(await traceAnalysis('voice_analysis',()=>extractor(voiceText))));
     const saved=store.createReviewed(analysis,b.conversationId);
     if(!saved.voiceSummary) return reply.code(409).send({error:'This call was previously deleted.'});
     return {summary:saved.voiceSummary,duplicate:saved.duplicate};
-  } catch(error){const diagnosis=describeAnalysisError(error);console.error(`Voice capture failed: ${diagnosis.kind} (${analysisErrorFingerprint(error)})`);return reply.code(502).send({error:'Could not analyze and save this call. Please try again.'});}
+  } catch(error){const diagnosis=describeAnalysisError(error);console.error(`Voice capture failed: ${diagnosis.kind} (${analysisErrorFingerprint(error)})${diagnosis.kind==='invalid_output' ? ` [${safeValidationDetails(error)}]` : ''}`);return reply.code(502).send({error:'Could not analyze and save this call. Please try again.'});}
 });
 app.post('/api/replies/:id/analyze', async (req,reply) => {
   const context=store.replyAnalysisContext((req.params as {id:string}).id);
-  try {const analysis=replyAnalysisSchema.parse(await replyAnalyzer(context));return {...analysis,relationship:filterInsights(analysis.relationship,store.replyExistingInsights((req.params as {id:string}).id),2)};}
-  catch(error){const diagnosis=describeAnalysisError(error);const fingerprint=analysisErrorFingerprint(error);console.error(`Reply analysis failed: ${diagnosis.kind} (${fingerprint})`);return reply.code(502).send({error:diagnosis.kind==='invalid_output' ? 'The model returned an invalid reply analysis. Please try again; nothing was saved.' : diagnosis.message,category:diagnosis.kind});}
+  try {const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer(context)));return {...analysis,relationship:filterInsights(analysis.relationship,store.replyExistingInsights((req.params as {id:string}).id),2)};}
+  catch(error){const diagnosis=describeAnalysisError(error);const fingerprint=analysisErrorFingerprint(error);console.error(`Reply analysis failed: ${diagnosis.kind} (${fingerprint})${diagnosis.kind==='invalid_output' ? ` [${safeValidationDetails(error)}]` : ''}`);return reply.code(502).send({error:diagnosis.kind==='invalid_output' ? 'The model returned an invalid reply analysis. Please try again; nothing was saved.' : diagnosis.message,category:diagnosis.kind});}
 });
 app.post('/api/replies/:id/insights', async (req) => {store.addReplyInsights((req.params as {id:string}).id,req.body);return {ok:true};});
 app.post('/api/replies/:id/draft', async req => {const b=req.body as {body?:unknown;action?:unknown}|null;return store.createReplyDraft((req.params as {id:string}).id,b?.body,b?.action);});

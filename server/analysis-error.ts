@@ -38,3 +38,30 @@ export function analysisErrorFingerprint(error:unknown):string {
  }
  return parts.join(' > ') || 'non-object error';
 }
+
+/** Return only allowlisted schema paths and known validation codes, never model output. */
+export function safeValidationDetails(error:unknown):string {
+ const fields=new Set(['topic','people','tasks','description','assignee','uncertainties','question','draft','recipient','taskIndex','body','relationship','facts','feelings','needs','interpretations','coreQuestion','nextAction']);
+ const codes=new Set(['invalid_type','too_big','too_small','invalid_value','invalid_union','unrecognized_keys']);
+ const references:Record<string,string>={
+  'A draft needs a recipient, message, and associated task.':'draft_reference',
+  'The draft recipient must be listed under people.':'draft_recipient',
+  'Each task assignee must be listed under people.':'task_assignee',
+  'Question participants must be distinct and listed under people.':'question_people',
+  'People must have distinct names.':'duplicate_people',
+ };
+ const result=new Set<string>(),seen=new Set<unknown>(),queue:unknown[]=[error];
+ while(queue.length && seen.size<30){
+  const current=queue.shift();if(!current || typeof current!=='object' || seen.has(current))continue;seen.add(current);
+  const e=current as Record<string,unknown>;
+  if(e.name==='ExtractionValidationError' && typeof e.message==='string' && references[e.message])result.add(references[e.message]);
+  if(Array.isArray(e.issues))for(const issue of e.issues){
+   if(!issue || typeof issue!=='object')continue;const item=issue as Record<string,unknown>;
+   const path=Array.isArray(item.path)?item.path.map(part=>typeof part==='number'?'[]':typeof part==='string' && fields.has(part)?part:'?').join('.'):'';
+   const code=typeof item.code==='string' && codes.has(item.code)?item.code:'validation_error';
+   result.add(`${path || 'output'}:${code}`);
+  }
+  queue.push(e.cause,e.error,e.originalError,e.lastError);if(Array.isArray(e.errors))queue.push(...e.errors);
+ }
+ return [...result].slice(0,8).join(', ') || 'validation details unavailable';
+}

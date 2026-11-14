@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { analysisErrorFingerprint, describeAnalysisError } from './analysis-error.ts';
+import { analysisErrorFingerprint, describeAnalysisError, safeValidationDetails } from './analysis-error.ts';
 import { validateExtraction } from '../shared/extraction.ts';
 import { Store } from './store.ts';
 import { createApp } from './app.ts';
@@ -25,4 +25,18 @@ test('invalid model cross-references are classified without leaking analysis tex
 test('extraction API reports category without returning sensitive provider errors', async () => {
  const store=new Store(':memory:');const app=createApp(store,async()=>{throw Object.assign(new Error('sensitive secret and conversation'),{statusCode:429});});
  try {const res=await app.inject({method:'POST',url:'/api/extract',payload:{text:'test'}});assert.equal(res.statusCode,502);assert.equal(res.json().category,'rate_limit');assert.doesNotMatch(res.body,/sensitive secret|conversation/);} finally {await app.close();store.close();}
+});
+
+ test('validation diagnostics disclose only allowed fields and codes',()=>{
+  const details=safeValidationDetails({cause:{issues:[{path:['tasks',0,'assignee'],code:'invalid_type',message:'private content'},{path:['secret-person'],code:'secret-value'}]}});
+  assert.equal(details,'tasks.[].assignee:invalid_type, ?:validation_error');
+  assert.doesNotMatch(details,/private|secret/);
+  assert.equal(safeValidationDetails({name:'ExtractionValidationError',message:'The draft recipient must be listed under people.'}),'draft_recipient');
+ });
+
+test('model assignee repair preserves tasks without guessing a person',async()=>{
+ const {normalizeModelExtraction}=await import('../shared/extraction.ts');
+ const model={topic:'Test',people:['Bob'],tasks:[{description:'Check in',assignee:'bob'},{description:'Reflect',assignee:'User'}],uncertainties:[],draft:null};
+ assert.deepEqual(normalizeModelExtraction(model).tasks,[{description:'Check in',assignee:'Bob'},{description:'Reflect',assignee:''}]);
+ assert.throws(()=>validateExtraction(model),/assignee/);
 });
