@@ -13,6 +13,7 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 | P0 | LEGO-inspired UI redesign | 2.5 h | The main demo screens and Graph have a cohesive, distinctive visual style and remain readable. |
 | P0 | Reliability and usability | 1.5 h | Fix blocking failures, preserve state, and keep the main flow understandable. |
 | P1 | Agent reasoning and adaptation | 1 h | Demonstrate one context-aware next action based on a reviewed edit or confirmed reply. |
+| P1 | Semantic memory and hybrid retrieval | Time permitting, after P0 | Evaluate and, if feasible, demonstrate more accurate conversation-scoped deduplication and retrieval. |
 | P1 | Photon outbound voice | 0.75 h | First verify sponsor requirements; if needed and feasible, test a call to the developer's own phone. Stop when the timebox ends. |
 | P1 | Healthcare positioning and submission materials | 0.75 h | Write the use case, known limits, documentation, and required submission details. |
 | P0 | Final debugging and demo preparation | 2 h | Run the full scenario, rehearse, record a backup, and submit on time. |
@@ -20,6 +21,8 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 **Final two hours:** reserve 45 minutes for an end-to-end run and blocking fixes, 30 minutes to rehearse the two-minute pitch, 30 minutes to record or verify a backup, and 15 minutes for submission checks. Adapt the split if the official deadline is sooner.
 
 **Cut order:** defer asynchronous voice messages, advanced memory or multi-agent work, visual details outside the main demo flow, and outbound voice if it is not required or cannot be completed within its timebox. Never cut contact confirmation or explicit approval for real messages.
+
+The semantic memory work below is a P1 stretch goal and is not included in the original 10-hour estimates. Protect P0 and the final two hours; adjust the budget if pursuing it.
 
 ## P0 — End-to-End Demo (All Three Tracks)
 
@@ -62,6 +65,15 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 - [ ] **Creativity:** Show how an unstructured conversation becomes actionable memory and supported follow-through, using a concrete example.
 - [ ] Verify sponsor-specific eligibility and submission requirements with the organizers.
 
+## P1 — Semantic Memory and Hybrid Retrieval
+
+- [ ] Build a small synthetic evaluation set for paraphrases, different people, dates, negations, and changed boundaries; compare results with the existing lexical cosine filter.
+- [ ] Add semantic embeddings for conversation-scoped, same-category insight matching, with conservative thresholds and a lexical fallback if the provider is unavailable.
+- [ ] Explore BM25 keyword retrieval for exact names, phrases, and details in context recovery; combine semantic and keyword results with rank fusion if it improves the evaluation.
+- [ ] Evaluate lightweight vector storage compatible with the existing TypeScript and SQLite architecture; add a vector database only if it improves the prototype enough to justify setup and operational complexity.
+- [ ] Keep sensitive data scoped to the right conversation, disclose any additional provider processing, and remove associated vectors and indexes when conversations are deleted.
+- [ ] Demonstrate a measured improvement on the evaluation set and accurately describe what is implemented, rather than claiming semantic retrieval solely because a dependency is present.
+
 ## P1 — Main Track: Best Healthcare Hack
 
 - [ ] **Target users:** Explain the accessibility needs of neurodivergent people, including possible challenges with working memory, attention, reading, task initiation, and interpersonal communication; avoid treating all users as the same.
@@ -89,6 +101,7 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 
 ## P2 — After the MVP / Only If Time Remains
 
+- [ ] Profile Graph layout and rendering on representative data before considering WebAssembly; adopt it only if a measured bottleneck and a compatible implementation justify the added integration work.
 - [ ] Explore asynchronous mobile voice messages: record and send a clip, then play the agent's response later without keeping a call open.
 - [ ] Add caller verification before considering phone access to saved context or voice-based approvals.
 - [ ] Support multiple Graph updates in one call and cross-channel continuity.
