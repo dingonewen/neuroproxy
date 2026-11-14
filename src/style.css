@@ -324,3 +324,56 @@ section.graph{background:hsl(var(--secondary) / .15)}
 .saved-node .saved-node-status{font-size:.68rem}
 .react-flow__node small{font-size:.62rem}
 #conversation-text,#recovery-question{font-size:.8rem}
+
+/* Align stage labels and headings consistently across the four workflow panels. */
+section.conversation-panel,section.graph,section.delegation-panel,section.recovery-panel{padding:20px}
+.conversation-panel .panel-heading h2,.graph>h2,.delegation-panel .action-title,.recovery-panel h2{margin:10px 0 12px}
+@media(max-width:620px){section.conversation-panel,section.graph,section.delegation-panel,section.recovery-panel{padding:17px!important}}
+
+.saved-node>div:not(.saved-node-label){font-size:.8rem}
+
+/* Shared type and spacing levels across the dashboard. */
+.conversation-panel .panel-heading h2,.graph>h2,.delegation-panel .action-title,.recovery-panel h2{margin:14px 0 12px}
+.saved-context .review-heading h3,.delegation-panel .delegations-heading{font-size:1.1rem;line-height:1.25;font-weight:750;letter-spacing:-.025em;color:#332747}
+.input-label label,.recovery-panel .input-label label,.graph-conversation-label label{font-size:.8rem;font-weight:600;line-height:1.3}
+.category-card h4,.category-heading h4{font-size:.9rem;line-height:1.3}
+
+.graph-conversation-label .graph-actions{position:relative;top:-3px}
+
+.graph-actions .refresh-button{background:hsl(145 52% 66%)!important;color:hsl(var(--foreground))!important}
+section.conversation-panel,section.graph,section.delegation-panel,section.recovery-panel,.brand{transition:transform 150ms cubic-bezier(.22,1,.3,1.12),box-shadow 150ms cubic-bezier(.22,1,.3,1.12)}
+@media(hover:hover) and (pointer:fine){
+ section.conversation-panel:hover,section.graph:hover,section.delegation-panel:hover,section.recovery-panel:hover{transform:translate(4px,4px);box-shadow:4px 4px 0 hsl(var(--shadow-color))}
+}
+@media(prefers-reduced-motion:reduce){section.conversation-panel,section.graph,section.delegation-panel,section.recovery-panel,.brand{transition:none}section.conversation-panel:hover,section.graph:hover,section.delegation-panel:hover,section.recovery-panel:hover{transform:none}}
+
+/* Four studs indicate the current workflow stage. */
+.conversation-panel:before,.graph:before,.delegation-panel:before,.recovery-panel:before{
+ --stud-1:#c8babb;--stud-2:#c8babb;--stud-3:#c8babb;--stud-4:#c8babb;
+ background-image:radial-gradient(circle,var(--stud-1) 0 4px,transparent 4.5px),radial-gradient(circle,var(--stud-2) 0 4px,transparent 4.5px),radial-gradient(circle,var(--stud-3) 0 4px,transparent 4.5px),radial-gradient(circle,var(--stud-4) 0 4px,transparent 4.5px);
+ background-size:11px 11px;background-position:0 0,11px 0,22px 0,33px 0;background-repeat:no-repeat;opacity:1
+}
+.conversation-panel:before{--stud-1:hsl(var(--primary))}
+.graph:before{--stud-2:hsl(var(--primary))}
+.delegation-panel:before{--stud-3:hsl(var(--primary))}
+.recovery-panel:before{--stud-4:hsl(var(--primary))}
+.brand:after{background-image:radial-gradient(circle,hsl(145 52% 47%) 0 5px,transparent 5.5px);opacity:1}
+
+/* Solid studs make the active stage distinguishable on every panel color. */
+.conversation-panel:before,.graph:before,.delegation-panel:before,.recovery-panel:before{
+ width:9px;height:9px;right:56px;top:18px;border-radius:50%;z-index:2;
+ --stud-1:#b6a8aa;--stud-2:#b6a8aa;--stud-3:#b6a8aa;--stud-4:#b6a8aa;
+ background:var(--stud-1);box-shadow:12px 0 0 var(--stud-2),24px 0 0 var(--stud-3),36px 0 0 var(--stud-4)
+}
+.conversation-panel:before{--stud-1:#ed535b}
+.graph:before{--stud-2:#ed535b}
+.delegation-panel:before{--stud-3:#ed535b}
+.recovery-panel:before{--stud-4:#ed535b}
+.brand:after{width:10px;height:10px;right:74px;top:20px;border-radius:50%;z-index:2;background:hsl(var(--secondary));box-shadow:16px 0 0 hsl(var(--secondary)),32px 0 0 hsl(var(--secondary)),48px 0 0 hsl(var(--secondary))}
+
+.brand:after{content:'♥ ♥ ♥ ♥';width:auto;height:auto;right:20px;top:16px;background:none;box-shadow:none;border-radius:0;color:#8c8588;font-size:15px;line-height:1;letter-spacing:2px;white-space:nowrap}
+
+/* Quiet, icon-only contextual help. */
+button.info-trigger{width:18px;height:18px;border:0;background:transparent;color:#786b70;box-shadow:none;padding:1px}
+button.info-trigger:hover:not(:disabled){color:hsl(var(--foreground));transform:none;box-shadow:none}
+.info-trigger svg{width:16px;height:16px;stroke-width:2}

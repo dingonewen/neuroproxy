@@ -1,6 +1,17 @@
-import { toPng } from 'html-to-image';
+/** Wrap text without losing words or Unicode characters. */
+export function wrapGraphText(text:string,maxWidth:number,measure:(value:string)=>number):string[] {
+ if(!text)return [];
+ const lines:string[]=[];let line='';
+ for(const word of text.split(/\s+/u)){
+  const candidate=line ? `${line} ${word}` : word;
+  if(measure(candidate)<=maxWidth){line=candidate;continue;}
+  if(line){lines.push(line);line='';}
+  for(const char of word){if(line && measure(line+char)>maxWidth){lines.push(line);line='';}line+=char;}
+ }
+ if(line)lines.push(line);return lines;
+}
 
-/** Composite the HTML node layer with SVG edges drawn directly into canvas. */
+/** Draw the graph directly instead of relying on browser HTML snapshots. */
 export async function graphExportImage(element:HTMLElement):Promise<string> {
  const bounds=element.getBoundingClientRect();
  if(!bounds.width || !bounds.height)throw new Error('Graph canvas is not ready.');
@@ -27,12 +38,27 @@ export async function graphExportImage(element:HTMLElement):Promise<string> {
   const x=rect.left-bounds.left,y=rect.top-bounds.top;ctx.fillStyle='#fff';ctx.fillRect(x-3,y-2,rect.width+6,rect.height+4);
   ctx.fillStyle='#20191d';ctx.font=`${Math.max(5,rect.height*.85)}px Inter, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(content,x+rect.width/2,y+rect.height/2);
  }
- const nodeLayer=await toPng(element,{
-  pixelRatio,backgroundColor:'transparent',style:{background:'transparent',backgroundColor:'transparent',borderColor:'transparent'},
-  filter:node=>!(node instanceof Element && (node.classList.contains('react-flow__controls') || node.classList.contains('react-flow__edges') || node.classList.contains('react-flow__background'))),
- });
- const image=new Image();await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=()=>reject(new Error('Could not render graph nodes.'));image.src=nodeLayer;});
- ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(image,0,0,output.width,output.height);
+ // Paint nodes directly; browser foreignObject snapshots can drop offscreen HTML nodes.
+ ctx.textAlign='left';ctx.textBaseline='top';
+ for(const node of element.querySelectorAll<HTMLElement>('.react-flow__node')){
+  const rect=node.getBoundingClientRect();if(!rect.width || !rect.height || !node.offsetWidth)continue;
+  const scale=rect.width/node.offsetWidth,x=rect.left-bounds.left,y=rect.top-bounds.top,padding=8*scale;
+  const style=getComputedStyle(node);ctx.fillStyle='#20191d';ctx.fillRect(x+4*scale,y+4*scale,rect.width,rect.height);
+  ctx.fillStyle=style.backgroundColor;ctx.fillRect(x,y,rect.width,rect.height);
+  ctx.strokeStyle='#20191d';ctx.lineWidth=Math.max(.5,2*scale);ctx.strokeRect(x,y,rect.width,rect.height);
+  const title=node.querySelector('strong')?.textContent?.trim() ?? '';
+  const status=node.querySelector('small')?.textContent?.trim() ?? '';
+  let body=node.textContent?.trim() ?? '';if(title && body.startsWith(title))body=body.slice(title.length).trim();if(status && body.endsWith(status))body=body.slice(0,-status.length).trim();
+  const maxWidth=Math.max(1,rect.width-2*padding),titleSize=12*scale,statusSize=8*scale;
+  let bodySize=12*scale,lines:string[]=[];
+  const available=Math.max(0,rect.height-2*padding-(title?titleSize*1.35:0)-(status?statusSize*1.4:0));
+  do{ctx.font=`400 ${bodySize}px Inter, sans-serif`;lines=wrapGraphText(body,maxWidth,value=>ctx.measureText(value).width);if(lines.length*bodySize*1.3<=available || bodySize<=4*scale)break;bodySize*=.9;}while(true);
+  ctx.save();ctx.beginPath();ctx.rect(x,y,rect.width,rect.height);ctx.clip();ctx.fillStyle='#20191d';let textY=y+padding;
+  if(title){ctx.font=`700 ${titleSize}px Inter, sans-serif`;ctx.fillText(title,x+padding,textY,maxWidth);textY+=titleSize*1.35;}
+  ctx.font=`400 ${bodySize}px Inter, sans-serif`;for(const line of lines){ctx.fillText(line,x+padding,textY,maxWidth);textY+=bodySize*1.3;}
+  if(status){ctx.font=`400 ${statusSize}px Inter, sans-serif`;ctx.fillStyle='#655b66';ctx.fillText(status,x+padding,Math.min(textY,y+rect.height-padding-statusSize),maxWidth);}
+  ctx.restore();
+ }
  return output.toDataURL('image/png');
 }
 

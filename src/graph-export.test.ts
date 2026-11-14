@@ -9,3 +9,10 @@ test('export layout keeps all graph bounds inside the image at any position or s
   assert.ok(result.width<=4001 && result.height<=4001);
  }
 });
+
+test('graph text wraps without losing words or Unicode characters',async()=>{
+ const {wrapGraphText}=await import('./graph-export.ts');
+ const lines=wrapGraphText('Hello world 中文测试',5,s=>Array.from(s).length);
+ assert.deepEqual(lines,['Hello','world','中文测试']);
+ assert.deepEqual(wrapGraphText('abcdefgh',3,s=>s.length),['abc','def','gh']);
+});
