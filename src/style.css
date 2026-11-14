@@ -209,3 +209,18 @@ main{display:grid;grid-template-columns:minmax(245px,1fr) minmax(245px,1.08fr) m
  .graph{min-height:0}
  .graph .canvas{min-height:280px}
 }
+
+/* Give the graph and action column a taller shared desktop row. */
+@media(min-width:1051px){
+ main{grid-template-rows:minmax(195px,auto) minmax(260px,33vh) minmax(840px,100vh)}
+ .graph .canvas{min-height:620px}
+ .delegation-panel{display:flex;flex-direction:column;min-height:0}
+ .delegation-messages{flex:1;min-height:0;max-height:none}
+}
+
+/* Keep React Flow inside a definite canvas height as the panels grow. */
+.canvas{position:relative;overflow:hidden}
+@media(min-width:1051px){
+ main{grid-template-rows:minmax(195px,auto) minmax(260px,33vh) minmax(1008px,120vh)}
+ .graph .canvas{flex:0 0 auto;height:max(620px,calc(100vh - 180px));min-height:620px;max-width:100%}
+}
