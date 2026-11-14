@@ -1,0 +1,32 @@
+{
+  "name": "neuroproxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server/index.ts",
+    "build": "vite build && tsc --noEmit",
+    "test": "node --test server/*.test.ts",
+    "dev:web": "vite --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
+    "@mastra/core": "^1.0.0",
+    "fastify": "^5.3.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "reactflow": "^11.11.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "tsx": "^4.23.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
