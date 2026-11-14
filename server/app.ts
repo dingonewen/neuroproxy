@@ -40,6 +40,7 @@ app.get('/api/voice/elevenlabs/status', async (_req,reply) => {
 });
 app.get('/api/contacts', async () => ({contacts:store.contacts()}));
 app.post('/api/contacts', async req=>{const b=req.body as {name?:unknown;handle?:unknown}|null;return store.createContact(b?.name,b?.handle);});
+app.patch('/api/contacts/:id', async req=>{const b=req.body as {name?:unknown}|null;store.renameContact((req.params as {id:string}).id,b?.name);return {ok:true};});
 app.delete('/api/contacts/:id', async req=>{store.deleteContact((req.params as {id:string}).id);return {ok:true};});
 app.put('/api/people/:id/contact', async req=>{const b=req.body as {contactId?:unknown}|null;store.bindContact((req.params as {id:string}).id,b?.contactId);return {ok:true};});
 app.get('/api/imessage-conversations', async () => ({conversations:store.imessageSessions()}));

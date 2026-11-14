@@ -39,3 +39,33 @@ test('signed inbound iMessage enables only an explicitly approved reply and trac
   assert.equal(store.graph().drafts.find(d=>d.id===draft)?.state,'reply_received');
  }finally{await app.close();store.close();}
 });
+
+test('iMessage follow-up reuses the latest session and requires approval for each turn',async()=>{
+ let sends=0;const bodies:Record<string,unknown>[]=[];
+ const sentIds=['pho_msg_00000000000000000000000002','pho_msg_00000000000000000000000003'];
+ const mock:typeof fetch=async (_url,request)=>{bodies.push(JSON.parse(String(request?.body)));return Response.json({id:sentIds[sends++],projectId:project,space:{id:space},status:'accepted'},{status:202});};
+ const store=new Store(':memory:');const app=createApp(store,undefined,{secret,projectId:project},new PhotonSender({apiKey:'pho_sk_test',projectId:project},mock));
+ try{
+  store.receivePhoton({eventId:'initial',messageId:incoming,spaceId:space,senderId:human,recipientId:agent,parentMessageId:null,body:'Start',imessage:{humanHandle:'+14155550123',agentHandle:'+14155550124'}});
+  const draft=store.create('Project','Alex','Check in','How are you?');bindTestContact(store,draft);
+  const firstSession=store.imessageSessions()[0];const send=(draftId:string,nodeId:unknown,body:string,consent:boolean)=>app.inject({method:'POST',url:`/api/drafts/${draftId}/approve-photon-imessage`,payload:{nodeId,approvedHandle:'+14155550123',approvedBody:labelRealSms(body,''),consent,label:''}});
+  assert.equal((await send(draft,firstSession.nodeId,'How are you?',false)).statusCode,400);assert.equal(sends,0);
+  assert.equal((await send(draft,firstSession.nodeId,'How are you?',true)).statusCode,200);assert.equal(sends,1);
+  const replyId='pho_msg_00000000000000000000000004';
+  store.receivePhoton({eventId:'next',messageId:replyId,spaceId:space,senderId:human,recipientId:agent,parentMessageId:sentIds[0],body:'Doing well',imessage:{humanHandle:'+14155550123',agentHandle:'+14155550124'}});
+  const reply=store.graph().nodes.find(n=>n.kind==='reply'&&n.label==='Doing well')!;const sessions=store.imessageSessions();assert.equal(sessions.length,1);assert.equal(sessions[0].nodeId,reply.id);
+  const created=await app.inject({method:'POST',url:`/api/replies/${reply.id}/draft`,payload:{body:'Glad to hear it.',action:'Respond'}});assert.equal(created.statusCode,200);const follow=created.json().id;
+  assert.equal(store.graph().drafts.find(d=>d.id===follow)?.state,'pending_approval');assert.equal(sends,1);
+  assert.equal((await send(follow,reply.id,'Glad to hear it.',false)).statusCode,400);assert.equal(sends,1);
+  assert.equal((await send(follow,reply.id,'Glad to hear it.',true)).statusCode,200);assert.equal(sends,2);assert.equal(bodies[1].parentMessageId,replyId);
+  assert.equal((await send(follow,reply.id,'Glad to hear it.',true)).statusCode,400);assert.equal(sends,2);
+ }finally{await app.close();store.close();}
+});
+
+test('session list keeps the newest message per conversation before applying its limit',()=>{
+ const store=new Store(':memory:');try{
+  store.receivePhoton({eventId:'other',messageId:'other',spaceId:'other-space',senderId:human,recipientId:agent,parentMessageId:null,body:'Other',imessage:{humanHandle:'+14155550999',agentHandle:'+14155550124'}});
+  for(let i=0;i<55;i++)store.receivePhoton({eventId:`event-${i}`,messageId:`message-${i}`,spaceId:space,senderId:human,recipientId:agent,parentMessageId:null,body:'Ping',imessage:{humanHandle:'+14155550123',agentHandle:'+14155550124'}});
+  const sessions=store.imessageSessions();assert.equal(sessions.length,2);assert.ok(sessions.some(s=>s.humanHandle==='+14155550999'));
+ }finally{store.close();}
+});

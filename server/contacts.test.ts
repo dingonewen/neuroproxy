@@ -40,3 +40,18 @@ test('contact binding persists after restart and deleting a graph keeps the reus
   assert.equal(store.graph().nodes.length,0);assert.equal(store.contacts().length,1);store.deleteContact(contact.id);assert.equal(store.contacts().length,0);
  }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('contact renaming and rebinding the same verified address preserve message history',()=>{
+ const store=new Store(':memory:');try{
+  const first=store.createContact('Alice','+14155550123');const draft=store.create('Topic','Alice','Ask','Hi');
+  const person=String(store.graph().drafts[0].person_id);store.bindContact(person,first.id);
+  store.preparePhone(draft,'+14155550123',labelRealSms('Hi'));
+  store.failPreparation(draft);
+  store.renameContact(first.id,'Alex');assert.equal(store.graph().drafts[0].contact_name,'Alex');
+  const same=store.createContact('Alex','+14155550123');const other=store.createContact('Other','+14155550124');
+  assert.throws(()=>store.bindContact(person,other.id),/cannot be rebound/);
+  store.bindContact(person,same.id);assert.equal(store.graph().drafts[0].contact_id,same.id);
+  store.deleteContact(same.id);store.bindContact(person,first.id);assert.equal(store.graph().drafts[0].contact_id,first.id);
+  store.deleteContact(first.id);assert.throws(()=>store.bindContact(person,other.id),/cannot be rebound/);
+ }finally{store.close();}
+});

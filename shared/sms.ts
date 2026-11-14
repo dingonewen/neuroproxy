@@ -1,5 +1,5 @@
 export const NEUROPROXY_LABEL = '— Sent with assistance from NeuroProxy';
-export const DEFAULT_CUSTOM_LABEL = '↳ with help from NeuroProxy';
+export const DEFAULT_CUSTOM_LABEL = '✦ Written with NeuroProxy';
 
 export function validMessageLabel(label:unknown): label is string {
   return typeof label==='string' && label.length<=120;

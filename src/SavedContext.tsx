@@ -7,7 +7,6 @@ const groups=[
  {label:'People',kinds:['person']}, {label:'Tasks',kinds:['task']},
  {label:'Unresolved Questions',kinds:['question']},
  {label:'Relationship Context',kinds:['reported_fact','feeling','need','interpretation','core_question','suggested_action']},
- {label:'Messages and Replies',kinds:['message','reply']},
 ];
 const names:Record<string,string>={person:'Person',task:'Task',question:'Question',reported_fact:'Reported Fact',feeling:'Expressed Feeling',need:'Expressed Need',interpretation:'Possible Interpretation',core_question:'Core Question',suggested_action:'Suggested Next Action',message:'Message',reply:'Reply'};
 const editable=new Set(['topic','person','task','question','reported_fact','feeling','need','interpretation','core_question','suggested_action']);
@@ -22,9 +21,9 @@ export function SavedContext({nodes,onRefresh,navigation}:{nodes:ContextNode[];o
  useEffect(()=>{if(navigation)setSelectedId(navigation.id);},[navigation]);
  if(!nodes.length)return null;
  const topic=nodes.find(n=>n.kind==='topic');
- const known=new Set(['topic',...groups.flatMap(g=>g.kinds)]);
+ const known=new Set(['topic','message','reply',...groups.flatMap(g=>g.kinds)]);
  const sections=[...groups,{label:'Other Context',kinds:[...new Set(nodes.filter(n=>!known.has(n.kind)).map(n=>n.kind))]}];
- return <div className="saved-context"><div className="review-heading"><h3>Saved Context</h3><InfoTip>Use Revisit to correct saved context or an unsent message draft.</InfoTip><p className="saved-context-subtitle">Conversation Details</p></div>
+ return <div className="saved-context"><div className="review-heading"><h3>Saved Context</h3><InfoTip>Use Revisit to correct saved context.</InfoTip><p className="saved-context-subtitle">Conversation Details</p></div>
   <div className="topic-card">{topic?<SavedNode key={topic.id} node={topic} title="Topic" onRefresh={onRefresh} selected={selectedId===topic.id} onSelect={()=>setSelectedId(topic.id)}/>:<strong>Unlinked Messages</strong>}
    {sections.map(group=>{const members=nodes.filter(n=>group.kinds.includes(n.kind));if(!members.length)return null;return <div className="category-card" id={group.label==='Relationship Context'?'context-relationship-section':undefined} key={group.label}><div className="category-heading"><h4>{group.label}</h4><span>{members.length}</span></div>{members.map((node,i)=><SavedNode key={node.id} node={node} title={`${names[node.kind] ?? node.kind.replaceAll('_',' ')} ${i+1}`} onRefresh={onRefresh} selected={selectedId===node.id} onSelect={()=>setSelectedId(node.id)}/>)}</div>;})}
   </div>

@@ -28,6 +28,10 @@ export class Store {
     if(value.length>254)throw Error('Contact address is too long.');
     const id=randomUUID();this.db.prepare('INSERT INTO contacts VALUES (?,?,?)').run(id,name.trim(),value);return {id};
   }
+  renameContact(id:string,name:unknown) {
+    if(typeof name!=='string'||!name.trim()||name.trim().length>100) throw Error('Enter a contact name.');
+    if(!this.db.prepare('UPDATE contacts SET name=? WHERE id=?').run(name.trim(),id).changes) throw Error('Contact not found.');
+  }
   deleteContact(id:string) {
     this.db.exec('BEGIN IMMEDIATE');try {
       if(this.db.prepare("SELECT 1 FROM person_contacts p JOIN drafts d ON d.person_id=p.person_id WHERE p.contact_id=? AND d.state IN ('preparing','submitting') LIMIT 1").get(id))throw Error('A message to this contact is being sent. Try again after it finishes.');
@@ -40,7 +44,14 @@ export class Store {
     this.db.exec('BEGIN IMMEDIATE');try {
       if(!this.db.prepare("SELECT 1 FROM nodes WHERE id=? AND kind='person'").get(personId)||!this.db.prepare('SELECT 1 FROM contacts WHERE id=?').get(contactId))throw Error('Person or contact not found.');
       const current=this.db.prepare('SELECT contact_id FROM person_contacts WHERE person_id=?').get(personId) as {contact_id:string}|undefined;
-      if(current?.contact_id!==contactId && this.db.prepare("SELECT 1 FROM drafts WHERE person_id=? AND state NOT IN ('pending_approval','cancelled') LIMIT 1").get(personId))throw Error('This person has message history and cannot be rebound.');
+      if(current?.contact_id!==contactId && this.db.prepare("SELECT 1 FROM drafts WHERE person_id=? AND state NOT IN ('pending_approval','cancelled') LIMIT 1").get(personId)) {
+        if(this.db.prepare("SELECT 1 FROM drafts WHERE person_id=? AND state IN ('preparing','submitting') LIMIT 1").get(personId)) throw Error('A message is being sent. Try again after it finishes.');
+        const target=this.db.prepare('SELECT handle FROM contacts WHERE id=?').get(contactId) as {handle:string};
+        const previous=current && this.db.prepare('SELECT handle FROM contacts WHERE id=?').get(current.contact_id) as {handle:string}|undefined;
+        const history=this.db.prepare('SELECT p.recipient_phone AS handle FROM photon_preparations p JOIN drafts d ON d.id=p.draft_id WHERE d.person_id=?').all(personId) as {handle:string}[];
+        const matches=(handle:string)=>handle.trim().toLowerCase()===target.handle.trim().toLowerCase();
+        if(!(previous ? matches(previous.handle) : history.length>0 && history.every(entry=>matches(entry.handle)))) throw Error('This person has message history and cannot be rebound to a different or unverified address.');
+      }
       this.db.prepare('INSERT INTO person_contacts VALUES (?,?) ON CONFLICT(person_id) DO UPDATE SET contact_id=excluded.contact_id').run(personId,contactId);
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
@@ -181,7 +192,11 @@ export class Store {
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   imessageSessions() {
-    return this.db.prepare(`SELECT s.node_id AS nodeId,s.human_handle AS humanHandle,s.agent_handle AS agentHandle FROM imessage_sessions s JOIN photon_inbox i ON i.node_id=s.node_id ORDER BY i.rowid DESC LIMIT 50`).all();
+    return this.db.prepare(`SELECT nodeId,humanHandle,agentHandle FROM (
+      SELECT s.node_id AS nodeId,s.human_handle AS humanHandle,s.agent_handle AS agentHandle,i.rowid AS receivedOrder,
+        ROW_NUMBER() OVER (PARTITION BY i.space_id,lower(s.human_handle),lower(s.agent_handle) ORDER BY i.rowid DESC) AS position
+      FROM imessage_sessions s JOIN photon_inbox i ON i.node_id=s.node_id
+    ) WHERE position=1 ORDER BY receivedOrder DESC LIMIT 50`).all();
   }
   imessageTarget(nodeId:string) {
     return this.db.prepare(`SELECT i.space_id AS spaceId,i.recipient_id AS senderId,i.sender_id AS recipientId,i.message_id AS parentMessageId,s.human_handle AS humanHandle FROM imessage_sessions s JOIN photon_inbox i ON i.node_id=s.node_id WHERE s.node_id=?`).get(nodeId) as {spaceId:string;senderId:string;recipientId:string;parentMessageId:string;humanHandle:string}|undefined;
