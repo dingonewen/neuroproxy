@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { Store } from './store.ts';
 import { createAgent } from './agent.ts';
 import { extractConversation, type Extractor } from './extract.ts';
@@ -8,6 +9,7 @@ import { PhotonSender, type PhotonTarget } from './photon.ts';
 import { analysisErrorFingerprint, describeAnalysisError } from './analysis-error.ts';
 import { generateManualMessage, type ManualMessageGenerator } from './manual-message.ts';
 import { analyzeReply, replyAnalysisSchema, type ReplyAnalyzer } from './reply-analysis.ts';
+import { elevenLabsAgentStatus } from './elevenlabs.ts';
 export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
@@ -31,6 +33,11 @@ app.register(async (webhook) => {
   });
 });
 app.get('/api/graph', async () => store.graph());
+app.get('/api/voice/elevenlabs/status', async (_req,reply) => {
+  const agentId=process.env.ELEVENLABS_AGENT_ID;
+  if(!process.env.ELEVENLABS_API_KEY || !agentId)return {configured:false};
+  try{return {configured:true,agent:await elevenLabsAgentStatus(agentId)};}catch{return reply.code(502).send({error:'Could not retrieve the ElevenLabs agent. Check the agent ID and account access.'});}
+});
 app.get('/api/contacts', async () => ({contacts:store.contacts()}));
 app.post('/api/contacts', async req=>{const b=req.body as {name?:unknown;handle?:unknown}|null;return store.createContact(b?.name,b?.handle);});
 app.delete('/api/contacts/:id', async req=>{store.deleteContact((req.params as {id:string}).id);return {ok:true};});
@@ -58,6 +65,27 @@ app.post('/api/extract', async (req, reply) => {
   catch (error) { const diagnosis=describeAnalysisError(error); const fingerprint=analysisErrorFingerprint(error); console.error(`Analysis failed: ${diagnosis.kind} (${fingerprint})`); return reply.code(502).send({ error: diagnosis.kind==='unknown' ? `${diagnosis.message} Diagnostic: ${fingerprint}.` : diagnosis.message, category:diagnosis.kind }); }
 });
 app.post('/api/reviewed-context', async (req) => store.createReviewed(req.body));
+// Only expose this specific route to the voice provider. It cannot read existing
+// conversations or approve/send messages; the bearer token authenticates the
+// provider tool, not the person on the phone.
+app.post('/api/voice/capture', async (req,reply) => {
+  const secret=process.env.VOICE_TOOL_SECRET;
+  if(!secret || secret.length<32) return reply.code(503).send({error:'Voice tool is not configured.'});
+  const auth=req.headers.authorization;
+  const token=typeof auth==='string' && auth.startsWith('Bearer ')?auth.slice(7):'';
+  const digest=(value:string)=>createHash('sha256').update(value).digest();
+  if(!token || !timingSafeEqual(digest(token),digest(secret))) return reply.code(401).send({error:'Unauthorized.'});
+  const b=req.body as {conversationId?:unknown;text?:unknown}|null;
+  if(typeof b?.conversationId!=='string'||!/^conv_[A-Za-z0-9_-]{1,150}$/.test(b.conversationId)||typeof b.text!=='string'||!b.text.trim()||b.text.length>8000) return reply.code(400).send({error:'Provide a valid conversation ID and transcript (maximum 8000 characters).'});
+  const existing=store.voiceCapture(b.conversationId);
+  if(existing) return existing.summary?existing:reply.code(409).send({error:'This call was previously deleted.'});
+  try {
+    const analysis=validateExtraction(await extractor(b.text.trim()));
+    const saved=store.createReviewed(analysis,b.conversationId);
+    if(!saved.voiceSummary) return reply.code(409).send({error:'This call was previously deleted.'});
+    return {summary:saved.voiceSummary,duplicate:saved.duplicate};
+  } catch(error){const diagnosis=describeAnalysisError(error);console.error(`Voice capture failed: ${diagnosis.kind} (${analysisErrorFingerprint(error)})`);return reply.code(502).send({error:'Could not analyze and save this call. Please try again.'});}
+});
 app.post('/api/replies/:id/analyze', async (req,reply) => {
   const context=store.replyAnalysisContext((req.params as {id:string}).id);
   try {return replyAnalysisSchema.parse(await replyAnalyzer(context));}

@@ -10,3 +10,5 @@ NeuroProxy uses TypeScript end to end.
 
 Photon's published [2.0 introduction](https://photon.codes/blog/introducing-photon-2.0) documents Users, Spaces and Messages and says acceptance does not imply delivery. Check the current official competition rules before submission.
 
+
+Phone voice progress: a protected ElevenLabs webhook tool can save one proposed graph per call using the existing extractor, with no messaging permission. Live SIP provisioning, caller verification, phone context recovery, voice approval, and multi-turn graph updates remain outstanding.

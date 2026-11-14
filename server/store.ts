@@ -19,6 +19,7 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_preparations (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), recipient_phone TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, approved_at TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_message_labels (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), label TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, name TEXT NOT NULL, handle TEXT NOT NULL); CREATE TABLE IF NOT EXISTS person_contacts (person_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, contact_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS voice_captures (capture_hash TEXT PRIMARY KEY, topic_id TEXT REFERENCES nodes(id) ON DELETE SET NULL, summary TEXT NOT NULL);`);
   }
   contacts() {return this.db.prepare('SELECT id,name,handle FROM contacts ORDER BY name COLLATE NOCASE,id').all();}
   createContact(name:unknown,handle:unknown) {
@@ -148,6 +149,7 @@ export class Store {
         this.db.prepare('DELETE FROM photon_message_labels WHERE draft_id=?').run(String(draft.id));
         this.db.prepare('DELETE FROM drafts WHERE id=?').run(String(draft.id));
       }
+      if(topicId!=='unlinked') this.db.prepare("UPDATE voice_captures SET summary='' WHERE topic_id=?").run(topicId);
       for(const id of ids) this.db.prepare('DELETE FROM nodes WHERE id=?').run(id);
       this.db.exec('COMMIT');
     } catch(error){this.db.exec('ROLLBACK');throw error;}
@@ -242,13 +244,20 @@ export class Store {
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
-  createReviewed(value: unknown) {
+  voiceCapture(id:string) {
+    const existing=this.db.prepare('SELECT topic_id,summary FROM voice_captures WHERE capture_hash=?').get(eventHash(id)) as {topic_id:string|null;summary:string}|undefined;
+    return existing ? {summary:existing.topic_id?JSON.parse(existing.summary):null,duplicate:true} : null;
+  }
+  createReviewed(value:unknown):{topicId:string;draftId:string|null};
+  createReviewed(value:unknown,voiceCaptureId:string):{topicId:string|null;draftId:string|null;voiceSummary:{topic:string;people:string[];tasks:string[];suggestedMessage:string|null;requiresReview:boolean}|null;duplicate:boolean};
+  createReviewed(value: unknown, voiceCaptureId?:string):{topicId:string;draftId:string|null}|{topicId:string|null;draftId:string|null;voiceSummary:{topic:string;people:string[];tasks:string[];suggestedMessage:string|null;requiresReview:boolean}|null;duplicate:boolean} {
     const data: Extraction = validateExtraction(value);
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const topicId = this.node('topic', data.topic);
+      if(voiceCaptureId) {const existing=this.db.prepare('SELECT topic_id,summary FROM voice_captures WHERE capture_hash=?').get(eventHash(voiceCaptureId)) as {topic_id:string|null;summary:string}|undefined;if(existing){this.db.exec('COMMIT');return {topicId:existing.topic_id,draftId:null,voiceSummary:existing.topic_id?JSON.parse(existing.summary):null,duplicate:true};}}
+      const topicId = this.node('topic', data.topic, voiceCaptureId?'proposed':'', voiceCaptureId?'voice':'user');
       const people = new Map<string, string>();
-      for (const name of data.people) { const id = this.node('person', name); people.set(name, id); this.edge(topicId, id, 'involves'); }
+      for (const name of data.people) { const id = this.node('person', name,voiceCaptureId?'proposed':'',voiceCaptureId?'voice':'user'); people.set(name, id); this.edge(topicId, id, 'involves'); }
       const tasks = data.tasks.map((task, index) => {
         const hasDraft = data.draft?.taskIndex === index;
         const id = this.node('task', task.description, hasDraft ? 'pending_approval' : 'proposed');
@@ -263,7 +272,7 @@ export class Store {
       }
       if (data.relationship) {
         const r=data.relationship;
-        const add=(kind:string, label:string, edgeLabel:string)=>{if(!label.trim())return;const id=this.node(kind,label,'reviewed','analysis');this.edge(topicId,id,edgeLabel);};
+        const add=(kind:string, label:string, edgeLabel:string)=>{if(!label.trim())return;const id=this.node(kind,label,voiceCaptureId?'proposed':'reviewed','analysis');this.edge(topicId,id,edgeLabel);};
         r.facts.forEach(v=>add('reported_fact',v,'reported'));
         r.feelings.forEach(v=>add('feeling',v,'expressed feeling'));
         r.needs.forEach(v=>add('need',v,'expressed need'));
@@ -280,7 +289,9 @@ export class Store {
         draftId = randomUUID();
         this.db.prepare('INSERT INTO drafts VALUES (?,?,?,?,?,?,?)').run(draftId, recipient, body, 'pending_approval', personId, taskId, messageId);
       }
-      this.db.exec('COMMIT'); return { topicId, draftId };
+      const voiceSummary=voiceCaptureId?{topic:data.topic,people:data.people,tasks:data.tasks.map(t=>t.description),suggestedMessage:data.draft?.body ?? null,requiresReview:true}:undefined;
+      if(voiceCaptureId)this.db.prepare('INSERT INTO voice_captures VALUES (?,?,?)').run(eventHash(voiceCaptureId),topicId,JSON.stringify(voiceSummary));
+      this.db.exec('COMMIT'); return voiceSummary ? {topicId,draftId,voiceSummary,duplicate:false} : {topicId,draftId};
     } catch (e) { this.db.exec('ROLLBACK'); throw e; }
   }
   addReplyInsights(replyId:string, value:unknown) {
