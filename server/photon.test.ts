@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { labelRealSms } from '../shared/sms.ts';
 import { strict as assert } from 'node:assert';
 import { checkPhoton } from './photon.ts';
 const config={apiKey:'pho_sk_test',projectId:'pho_prj_00000000000000000000000001'};
@@ -28,7 +29,7 @@ function fakeSender(sendResult:'success'|'unknown'='success') {
  let sends=0;
  const mock:typeof fetch=async (input,options) => {
   const url=String(input);
-  if (options?.method==='POST') { sends++; assert.ok((options.headers as Record<string,string>)['idempotency-key']); assert.deepEqual(JSON.parse(String(options.body)).content,{type:'text',format:'plain',text:'When?'}); if(sendResult==='unknown') throw Error('timeout'); return Response.json({id:message,projectId:project,space:{id:space},status:'dispatched'},{status:202}); }
+  if (options?.method==='POST') { sends++; assert.ok((options.headers as Record<string,string>)['idempotency-key']); assert.deepEqual(JSON.parse(String(options.body)).content,{type:'text',format:'plain',text:labelRealSms('When?')}); if(sendResult==='unknown') throw Error('timeout'); return Response.json({id:message,projectId:project,space:{id:space},status:'dispatched'},{status:202}); }
   if(url.endsWith(`/spaces/${space}`)) return Response.json({id:space,projectId:project,platform:'sms',kind:'direct',participantIds:[sender,recipient]});
   if(url.endsWith(`/users/${sender}`)) return Response.json({id:sender,projectId:project,platform:'sms',kind:'agent'});
   if(url.endsWith(`/users/${recipient}`)) return Response.json({id:recipient,projectId:project,platform:'sms',kind:'human',handle:'+14155550123'});
@@ -40,12 +41,12 @@ test('real send requires explicit consent, exact draft and a verified recipient;
  const store=new Store(':memory:');const fake=fakeSender();const app=createApp(store,undefined,undefined,fake.client);const id=store.create('Project','Alex','Deadline','When?');
  try {
   const call=(payload:object)=>app.inject({method:'POST',url:`/api/drafts/${id}/approve-photon`,payload});
-  assert.equal((await call({...target,approvedBody:'When?',consent:false})).statusCode,400);
-  assert.equal((await call({...target,recipientPhone:'+14155550124',approvedBody:'When?',consent:true})).statusCode,400);
+  assert.equal((await call({...target,approvedBody:labelRealSms('When?'),consent:false})).statusCode,400);
+  assert.equal((await call({...target,recipientPhone:'+14155550124',approvedBody:labelRealSms('When?'),consent:true})).statusCode,400);
   assert.equal((await call({...target,approvedBody:'Different',consent:true})).statusCode,400);
   assert.equal(fake.sends(),0);
-  const sent=await call({...target,approvedBody:'When?',consent:true});assert.equal(sent.statusCode,200);assert.equal(sent.json().status,'waiting_for_reply');
-  assert.equal((await call({...target,approvedBody:'When?',consent:true})).statusCode,400);assert.equal(fake.sends(),1);
+  const sent=await call({...target,approvedBody:labelRealSms('When?'),consent:true});assert.equal(sent.statusCode,200);assert.equal(sent.json().status,'waiting_for_reply');
+  assert.equal((await call({...target,approvedBody:labelRealSms('When?'),consent:true})).statusCode,400);assert.equal(fake.sends(),1);
   assert.equal((await app.inject({method:'POST',url:`/api/drafts/${id}/simulate-reply`,payload:{body:'Fake'}})).statusCode,400);
   store.receivePhoton({eventId:'event-unlinked',messageId:'reply-unlinked',spaceId:space,senderId:recipient,recipientId:sender,parentMessageId:null,body:'Hello'});
   assert.equal(store.graph().drafts[0].state,'waiting_for_reply');
@@ -55,5 +56,5 @@ test('real send requires explicit consent, exact draft and a verified recipient;
 });
 test('unknown send outcome is not automatically retried',async()=>{
  const store=new Store(':memory:');const fake=fakeSender('unknown');const app=createApp(store,undefined,undefined,fake.client);const id=store.create('Project','Alex','Deadline','When?');
- try {const payload={...target,approvedBody:'When?',consent:true};const call=()=>app.inject({method:'POST',url:`/api/drafts/${id}/approve-photon`,payload});const result=await call();assert.equal(result.json().status,'send_unknown');assert.equal((await call()).statusCode,400);assert.equal(fake.sends(),1);} finally {await app.close();store.close();}
+ try {const payload={...target,approvedBody:labelRealSms('When?'),consent:true};const call=()=>app.inject({method:'POST',url:`/api/drafts/${id}/approve-photon`,payload});const result=await call();assert.equal(result.json().status,'send_unknown');assert.equal((await call()).statusCode,400);assert.equal(fake.sends(),1);} finally {await app.close();store.close();}
 });

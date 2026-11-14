@@ -4,6 +4,7 @@ import { strict as assert } from 'node:assert';
 import { Store } from './store.ts';
 import { createApp } from './app.ts';
 import { PhotonSender } from './photon.ts';
+import { labelRealSms } from '../shared/sms.ts';
 const project='pho_prj_00000000000000000000000001';
 const sender='pho_usr_00000000000000000000000001';
 const recipient='pho_usr_00000000000000000000000002';
@@ -27,14 +28,15 @@ function setup(options:{failSetup?:boolean;failSend?:boolean}={}) {
  const store=new Store(':memory:');const photon=new PhotonSender({apiKey:'pho_sk_test',projectId:project,smsNumber:ownPhone},mock);
  return {store,app:createApp(store,async()=>extracted,{secret:testSecret,projectId:project},photon),calls};
 }
-const payload={recipientPhone:phone,approvedBody:'When?',consent:true};
+const payload={recipientPhone:phone,approvedBody:labelRealSms('When?'),consent:true};
 test('phone-based approval prepares users and space, sends once, and reviews inferred replies',async()=>{
  const {store,app,calls}=setup(); const id=store.create('Project','Alex','Deadline','When?'); const url=`/api/drafts/${id}/approve-photon-phone`;
  try {
   assert.equal((await app.inject({method:'POST',url,payload:{...payload,consent:false}})).statusCode,400);
-  assert.equal((await app.inject({method:'POST',url,payload:{...payload,approvedBody:'Wrong'}})).statusCode,400); assert.equal(calls.length,0);
+  assert.equal((await app.inject({method:'POST',url,payload:{...payload,approvedBody:'Wrong'}})).statusCode,400);
+  assert.equal((await app.inject({method:'POST',url,payload:{...payload,approvedBody:'When?'}})).statusCode,400); assert.equal(calls.length,0);
   const sent=await app.inject({method:'POST',url,payload});assert.equal(sent.statusCode,200);assert.equal(sent.json().status,'waiting_for_reply');
-  assert.deepEqual(calls.map(c=>c.path),['/users','/users','/spaces','/messages']); assert.equal(new Set(calls.map(c=>c.key)).size,4);
+  assert.deepEqual(calls.map(c=>c.path),['/users','/users','/spaces','/messages']); assert.equal((calls.find(c=>c.path==='/messages')?.body.content as {text:string}).text,labelRealSms('When?')); assert.equal(store.graph().drafts[0].body,labelRealSms('When?')); assert.equal(new Set(calls.map(c=>c.key)).size,4);
   assert.equal((await app.inject({method:'POST',url,payload})).statusCode,400);assert.equal(calls.filter(c=>c.path==='/messages').length,1);
   store.receivePhoton({eventId:'event',messageId:'reply',spaceId:space,senderId:recipient,recipientId:sender,parentMessageId:null,createdAt:new Date(Date.now()+1000).toISOString(),body:'Saturday'});
   let graph=store.graph();const reply=graph.nodes.find(n=>n.label==='Saturday');assert.equal(reply?.status,'possible_reply');assert.equal(graph.drafts[0].state,'possible_reply');

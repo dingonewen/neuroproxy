@@ -2,3 +2,4 @@
 .review{margin-top:20px;padding-top:12px;border-top:1px solid #ddddeb}.review-row{display:flex;gap:8px;align-items:end}.review-row label{flex:1}.review-row button{margin-bottom:12px}.review-item{padding:10px;margin:10px 0;border:1px solid #ddddeb;border-radius:8px}select{display:block;width:100%;padding:10px;margin-top:5px;border:1px solid #a5a5bb;border-radius:6px;font:inherit;background:white}button:disabled{opacity:.55;cursor:not-allowed}
 fieldset.review{border:0;border-top:1px solid #ddddeb;padding:12px 0 0;margin:20px 0 0;min-width:0}
 .inline-choice{display:flex;align-items:center;gap:8px;font-weight:400}.inline-choice input{width:auto;margin:0}
+.sms-preview{white-space:pre-wrap;background:#f7f7fb;padding:12px;border-radius:6px}.send-real{background:#b42318;color:#fff}.send-real:hover:not(:disabled){background:#8f1b13}

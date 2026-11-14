@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Extraction } from '../shared/extraction';
 
-export function ConversationInput({ onSaved, onPreview }: { onSaved: (topicId:string) => Promise<void>; onPreview:(result:Extraction|null)=>void }) {
+export function ConversationInput({ onSaved, onPreview }: { onSaved: (topicId:string, context:Extraction, draftId:string|null) => Promise<void>; onPreview:(result:Extraction|null)=>void }) {
  const [text, setText] = useState('');
  const [result, setResult] = useState<Extraction | null>(null);
  const [busy, setBusy] = useState(false);
@@ -19,10 +19,12 @@ export function ConversationInput({ onSaved, onPreview }: { onSaved: (topicId:st
   if (!result) return;
   setBusy(true); setError('');
   try {
-   const res = await fetch('/api/reviewed-context', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(result) });
+   const relationship=result.relationship ? {...result.relationship, facts:result.relationship.facts.filter(v=>v.trim()),feelings:result.relationship.feelings.filter(v=>v.trim()),needs:result.relationship.needs.filter(v=>v.trim()),interpretations:result.relationship.interpretations.filter(v=>v.trim())} : result.relationship;
+   const reviewed={...result,relationship};
+   const res = await fetch('/api/reviewed-context', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(reviewed) });
    const data = await res.json(); if (!res.ok) throw new Error(data.error);
    setResult(null); setSaved(true);
-   try { await onSaved(data.topicId); } catch { setError('Saved, but the graph could not refresh. Reload the page.'); }
+   try { await onSaved(data.topicId, reviewed, data.draftId ?? null); } catch { setError('Saved, but the graph could not refresh. Reload the page.'); }
   } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
  }
  return <section>
@@ -39,7 +41,13 @@ export function ConversationInput({ onSaved, onPreview }: { onSaved: (topicId:st
    <button type="button" onClick={()=>setResult({...result,tasks:[...result.tasks,{description:'',assignee:''}]})}>Add task</button>
    <h4>Unresolved questions</h4><p>Choose only people related to each question. Leave unchecked if unknown.</p>{result.uncertainties.map((item,i)=><div className="review-item" key={i}><label>Question {i+1}<input value={item.question} onChange={e=>setResult({...result,uncertainties:result.uncertainties.map((v,j)=>j===i?{...v,question:e.target.value}:v)})}/></label><span>Related people</span>{result.people.filter(Boolean).map((person,j)=><label className="inline-choice" key={j}><input type="checkbox" checked={item.people.includes(person)} onChange={e=>setResult({...result,uncertainties:result.uncertainties.map((q,k)=>k===i?{...q,people:e.target.checked?[...q.people,person]:q.people.filter(p=>p!==person)}:q)})}/>{person}</label>)}<button type="button" onClick={()=>setResult({...result,uncertainties:result.uncertainties.filter((_,j)=>j!==i)})}>Remove question</button></div>)}
    <button type="button" onClick={()=>setResult({...result,uncertainties:[...result.uncertainties,{question:'',people:[]}]})}>Add question</button>
-   {result.draft && <div className="review-item"><h4>Suggested message draft</h4><p>Saving creates a draft only. Approve separately to simulate sending.</p><label>Recipient<select value={result.draft.recipient} onChange={e=>setResult({...result,draft:{...result.draft!,recipient:e.target.value}})}><option value="">Choose a person</option>{result.people.map((p,i)=><option key={i} value={p}>{p}</option>)}</select></label><label>Associated task<select value={result.draft.taskIndex ?? ''} onChange={e=>setResult({...result,draft:{...result.draft!,taskIndex:e.target.value === '' ? null : Number(e.target.value)}})}><option value="">Choose a task</option>{result.tasks.map((t,i)=><option key={i} value={i}>{t.description}</option>)}</select></label><label>Message<textarea value={result.draft.body} onChange={e=>setResult({...result,draft:{...result.draft!,body:e.target.value}})}/></label><button type="button" onClick={()=>setResult({...result,draft:null})}>Remove draft</button></div>}
+   {result.relationship && <div className="review-item"><h4>Relationship context</h4><p>Review these suggestions. Reported facts come from the conversation; interpretations are possibilities, not known motives.</p>
+    {(['facts','feelings','needs','interpretations'] as const).map(key=><label key={key}>{({facts:'Reported facts',feelings:'Expressed feelings',needs:'Expressed needs',interpretations:'Possible interpretations'})[key]} (one per line)<textarea value={result.relationship![key].join('\n')} onChange={e=>setResult({...result,relationship:{...result.relationship!,[key]:e.target.value.split('\n')}})}/></label>)}
+    <label>Core question<input value={result.relationship.coreQuestion} onChange={e=>setResult({...result,relationship:{...result.relationship!,coreQuestion:e.target.value}})}/></label>
+    <label>Suggested next action<input value={result.relationship.nextAction} onChange={e=>setResult({...result,relationship:{...result.relationship!,nextAction:e.target.value}})}/></label>
+    <button type="button" onClick={()=>setResult({...result,relationship:null})}>Remove relationship context</button>
+   </div>}
+   {result.draft && <div className="review-item"><h4>Suggested message draft</h4><p>Saving creates a draft only. Sending a real or simulated message requires separate approval.</p><label>Recipient<select value={result.draft.recipient} onChange={e=>setResult({...result,draft:{...result.draft!,recipient:e.target.value}})}><option value="">Choose a person</option>{result.people.map((p,i)=><option key={i} value={p}>{p}</option>)}</select></label><label>Associated task<select value={result.draft.taskIndex ?? ''} onChange={e=>setResult({...result,draft:{...result.draft!,taskIndex:e.target.value === '' ? null : Number(e.target.value)}})}><option value="">Choose a task</option>{result.tasks.map((t,i)=><option key={i} value={i}>{t.description}</option>)}</select></label><label>Message<textarea value={result.draft.body} onChange={e=>setResult({...result,draft:{...result.draft!,body:e.target.value}})}/></label><button type="button" onClick={()=>setResult({...result,draft:null})}>Remove draft</button></div>}
    <p><button type="button" disabled={busy} onClick={save}>Save reviewed context</button> <button type="button" disabled={busy} onClick={()=>setResult(null)}>Discard</button></p>
   </fieldset>}
  </section>;

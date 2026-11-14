@@ -1,12 +1,21 @@
 import { z } from 'zod';
 
 const text = z.string().trim().max(500);
+export const relationshipSchema = z.object({
+  facts: z.array(text.min(1)).max(10),
+  feelings: z.array(text.min(1)).max(10),
+  needs: z.array(text.min(1)).max(10),
+  interpretations: z.array(text.min(1)).max(10),
+  coreQuestion: text,
+  nextAction: text,
+});
 export const extractionSchema = z.object({
   topic: text.min(1),
   people: z.array(text.min(1)).max(20),
   tasks: z.array(z.object({ description: text.min(1), assignee: text })).max(20),
   uncertainties: z.array(z.object({ question: text.min(1), people: z.array(text.min(1)).max(20) })).max(20),
   draft: z.object({ recipient: text, taskIndex: z.number().int().nullable(), body: z.string().trim().max(2000) }).nullable(),
+  relationship: relationshipSchema.nullable().optional(),
 });
 export type Extraction = z.infer<typeof extractionSchema>;
 

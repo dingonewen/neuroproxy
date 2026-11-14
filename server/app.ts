@@ -49,6 +49,7 @@ app.post('/api/extract', async (req, reply) => {
   catch { return reply.code(502).send({ error: 'Analysis failed. Check NEUROPROXY_MODEL and provider credentials, then try again.' }); }
 });
 app.post('/api/reviewed-context', async (req) => store.createReviewed(req.body));
+app.post('/api/replies/:id/insights', async (req) => {store.addReplyInsights((req.params as {id:string}).id,req.body);return {ok:true};});
 app.post('/api/ask', async (req) => {
   const question = (req.body as {question?:unknown})?.question;
   if (typeof question !== 'string' || !question.trim() || question.length > 2000) throw new Error('Enter a question (maximum 2000 characters).');

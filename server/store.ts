@@ -1,8 +1,9 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
-import { validateExtraction, type Extraction } from '../shared/extraction.ts';
+import { validateExtraction, relationshipSchema, type Extraction } from '../shared/extraction.ts';
 import type { PhotonMessage } from './photon-webhook.ts';
 import { groupGraph } from '../shared/graph-groups.ts';
+import { labelRealSms } from '../shared/sms.ts';
 
 export class Store {
   db: DatabaseSync;
@@ -19,14 +20,14 @@ export class Store {
     try {
       const draft=this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string}|undefined;
       if (!draft || !['pending_approval','preparation_failed'].includes(draft.state)) throw new Error('Draft is not awaiting approval.');
-      if (draft.body!==approvedBody) throw new Error('The approved text does not match this draft.');
+      if (labelRealSms(draft.body)!==approvedBody) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       if (draft.state==='preparation_failed') this.db.prepare('DELETE FROM photon_preparations WHERE draft_id=?').run(id);
       const key=randomUUID();
       this.db.prepare('INSERT INTO photon_preparations VALUES (?,?,?,?)').run(id,phone,key,new Date().toISOString());
-      this.db.prepare("UPDATE drafts SET state='preparing' WHERE id=?").run(id);
+      this.db.prepare("UPDATE drafts SET state='preparing', body=? WHERE id=?").run(approvedBody,id);
       this.db.prepare("UPDATE nodes SET status='preparing' WHERE id=?").run(draft.task_id);
-      this.db.prepare("UPDATE nodes SET status='preparing', source='photon' WHERE id=?").run(draft.message_id);
-      this.db.exec('COMMIT'); return {key,body:draft.body};
+      this.db.prepare("UPDATE nodes SET status='preparing', source='photon', label=? WHERE id=?").run(approvedBody,draft.message_id);
+      this.db.exec('COMMIT'); return {key,body:approvedBody};
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   failPreparation(id:string) {
@@ -136,13 +137,13 @@ export class Store {
     try {
       const draft = this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string}|undefined;
       if (!draft || draft.state !== 'pending_approval') throw new Error('Draft is not awaiting approval.');
-      if (approvedBody !== draft.body) throw new Error('The approved text does not match this draft.');
+      if (approvedBody !== labelRealSms(draft.body)) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       const key = randomUUID();
       this.db.prepare('INSERT INTO photon_dispatches VALUES (?,?,?,?,?,?,NULL)').run(id,spaceId,senderId,recipientId,key,'submitting');
-      this.db.prepare("UPDATE drafts SET state='submitting' WHERE id=?").run(id);
-      this.db.prepare("UPDATE nodes SET status='submitting', source='photon' WHERE id=?").run(draft.message_id);
+      this.db.prepare("UPDATE drafts SET state='submitting', body=? WHERE id=?").run(approvedBody,id);
+      this.db.prepare("UPDATE nodes SET status='submitting', source='photon', label=? WHERE id=?").run(approvedBody,draft.message_id);
       this.db.prepare("UPDATE nodes SET status='submitting' WHERE id=?").run(draft.task_id);
-      this.db.exec('COMMIT'); return {body:draft.body, key};
+      this.db.exec('COMMIT'); return {body:approvedBody, key};
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   finishPhoton(id: string, messageId: string | null) {
@@ -176,6 +177,16 @@ export class Store {
         if (uncertainty.people.length) for (const name of uncertainty.people) this.edge(people.get(name)!, id, 'question about');
         else this.edge(topicId, id, 'unresolved');
       }
+      if (data.relationship) {
+        const r=data.relationship;
+        const add=(kind:string, label:string, edgeLabel:string)=>{if(!label.trim())return;const id=this.node(kind,label,'reviewed','analysis');this.edge(topicId,id,edgeLabel);};
+        r.facts.forEach(v=>add('reported_fact',v,'reported'));
+        r.feelings.forEach(v=>add('feeling',v,'expressed feeling'));
+        r.needs.forEach(v=>add('need',v,'expressed need'));
+        r.interpretations.forEach(v=>add('interpretation',v,'possible interpretation'));
+        add('core_question',r.coreQuestion,'core question');
+        add('suggested_action',r.nextAction,'suggested action');
+      }
       let draftId: string | null = null;
       if (data.draft) {
         const { recipient, body, taskIndex } = data.draft;
@@ -187,6 +198,18 @@ export class Store {
       }
       this.db.exec('COMMIT'); return { topicId, draftId };
     } catch (e) { this.db.exec('ROLLBACK'); throw e; }
+  }
+  addReplyInsights(replyId:string, value:unknown) {
+    const r=relationshipSchema.parse(value);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const reply=this.db.prepare("SELECT id FROM nodes WHERE id=? AND kind='reply' AND status='received'").get(replyId);
+      const linked=this.db.prepare("SELECT 1 FROM edges e JOIN drafts d ON d.message_id=e.source WHERE e.target=? AND e.label='reply'").get(replyId);
+      if(!reply || !linked) throw Error('Confirm and link the reply before saving analysis.');
+      const add=(kind:string,label:string,edgeLabel:string)=>{if(!label.trim())return;const id=this.node(kind,label,'reviewed','analysis');this.edge(replyId,id,edgeLabel);};
+      r.facts.forEach(v=>add('reported_fact',v,'reported'));r.feelings.forEach(v=>add('feeling',v,'expressed feeling'));r.needs.forEach(v=>add('need',v,'expressed need'));r.interpretations.forEach(v=>add('interpretation',v,'possible interpretation'));add('core_question',r.coreQuestion,'core question');add('suggested_action',r.nextAction,'suggested action');
+      this.db.exec('COMMIT');
+    } catch(error) {this.db.exec('ROLLBACK');throw error;}
   }
   create(topic: string, person: string, task: string, body: string) {
     if (![topic, person, task, body].every(x => typeof x === 'string' && x.trim().length > 0 && x.length <= 2000)) throw new Error('Complete each field (maximum 2000 characters).');

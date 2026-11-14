@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { labelRealSms } from '../shared/sms.ts';
 import { strict as assert } from 'node:assert';
 import { createApp } from './app.ts';
 import { Store } from './store.ts';
@@ -11,6 +12,22 @@ test('simulated delegation API persists a reply and rejects duplicate approval',
   res=await app.inject({method:'POST',url:`/api/drafts/${id}/simulate-reply`,payload:{body:'Saturday'}}); assert.equal(res.statusCode,200);
   res=await app.inject({method:'GET',url:'/api/graph'}); assert.equal(res.json().drafts[0].state,'reply_received'); assert.equal(res.json().nodes.find((n:{kind:string})=>n.kind==='reply').source,'simulated');
  } finally { await app.close(); store.close(); }
+});
+
+test('reviewed relationship insights stay distinct from reported facts and attach to confirmed replies', async () => {
+ const store=new Store(':memory:');const app=createApp(store);
+ const relationship={facts:['Alex said they are busy'],feelings:['User feels uncertain'],needs:['Clarity'],interpretations:['They may be busy, or may be declining'],coreQuestion:'Do they want to meet?',nextAction:'Ask once directly.'};
+ try {
+  const saved=await app.inject({method:'POST',url:'/api/reviewed-context',payload:{topic:'Meeting',people:['Alex'],tasks:[],uncertainties:[],draft:null,relationship}});
+  assert.equal(saved.statusCode,200);let graph=store.graph();
+  const interpretation=graph.nodes.find(n=>n.kind==='interpretation');assert.equal(interpretation?.label,relationship.interpretations[0]);assert.equal(interpretation?.source,'analysis');
+  assert.equal(graph.nodes.find(n=>n.kind==='reported_fact')?.label,relationship.facts[0]);assert.equal(graph.nodes.find(n=>n.kind==='suggested_action')?.status,'reviewed');
+  const id=store.create('Meeting','Alex','Ask','Are you free?');store.transition(id,'waiting_for_reply');store.reply(id,'Busy this week','simulated');
+  graph=store.graph();const reply=graph.nodes.find(n=>n.kind==='reply');
+  assert.equal((await app.inject({method:'POST',url:'/api/replies/not-a-reply/insights',payload:relationship})).statusCode,400);
+  assert.equal((await app.inject({method:'POST',url:`/api/replies/${reply?.id}/insights`,payload:relationship})).statusCode,200);
+  graph=store.graph();assert.ok(graph.edges.some(e=>e.source===reply?.id&&e.label==='possible interpretation'));assert.equal(graph.drafts.find(d=>d.id===id)?.state,'reply_received');
+ } finally {await app.close();store.close();}
 });
 
 test('extraction requires review and saves multiple tasks, uncertainties and an unapproved draft', async () => {
@@ -85,7 +102,7 @@ test('deleting a conversation with Photon activity is blocked and keeps its hist
  const store=new Store(':memory:');const app=createApp(store);
  try {
   const created=(await app.inject({method:'POST',url:'/api/reviewed-context',payload:{topic:'Real',people:['A'],tasks:[{description:'Check',assignee:'A'}],uncertainties:[],draft:{recipient:'A',taskIndex:0,body:'Hello?'}}})).json();
-  store.preparePhone(created.draftId,'+14155550123','Hello?');
+  store.preparePhone(created.draftId,'+14155550123',labelRealSms('Hello?'));
   const before=store.graph();const response=await app.inject({method:'DELETE',url:`/api/conversations/${created.topicId}`});assert.equal(response.statusCode,400);assert.match(response.json().error,/Photon activity/);assert.deepEqual(store.graph(),before);
  }finally{await app.close();store.close();}
 });
