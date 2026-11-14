@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server/index.ts",
+    "dev": "node --env-file-if-exists=.env server/index.ts",
     "build": "vite build && tsc --noEmit",
     "test": "node --test server/*.test.ts",
     "dev:web": "vite --host 127.0.0.1"
