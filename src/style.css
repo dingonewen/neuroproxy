@@ -377,3 +377,15 @@ section.conversation-panel,section.graph,section.delegation-panel,section.recove
 button.info-trigger{width:18px;height:18px;border:0;background:transparent;color:#786b70;box-shadow:none;padding:1px}
 button.info-trigger:hover:not(:disabled){color:hsl(var(--foreground));transform:none;box-shadow:none}
 .info-trigger svg{width:16px;height:16px;stroke-width:2}
+
+/* Mobile navigation reuses the same local workflow and approval controls. */
+.mobile-stage-nav{display:none}
+@media(max-width:620px){
+ main{padding-bottom:calc(95px + env(safe-area-inset-bottom))}
+ .mobile-stage-nav{position:fixed;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:30;background:hsl(var(--card));border:3px solid hsl(var(--border));box-shadow:4px 4px 0 hsl(var(--shadow-color))}
+ .mobile-stage-nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:55px;padding:5px 2px;color:hsl(var(--foreground));font-size:.6rem;font-weight:700;text-decoration:none}
+ .mobile-stage-nav a+a{border-left:1px solid hsl(var(--border)/.25)}
+ .mobile-stage-nav a:focus-visible{outline:3px solid hsl(var(--primary));outline-offset:-3px}
+ .mobile-stage-nav svg{width:18px;height:18px;stroke-width:2}
+ #understand,#visualize,#delegate,#reconnect{scroll-margin-top:12px}
+}

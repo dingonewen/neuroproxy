@@ -34,7 +34,7 @@ export function ConversationInput({ onSaved, onPreview, savedNodes, showingPrevi
    try { await onSaved(data.topicId, reviewed, data.draftId ?? null); } catch { setError('Saved, but the graph could not refresh. Reload the page.'); }
   } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
  }
- return <section className="conversation-panel">
+ return <section className="conversation-panel" id="understand">
   <div className="panel-heading"><span className="eyebrow">01 / Understand</span><h2><MessageCircle className="heading-icon" aria-hidden="true"/>Hear the Meaning</h2></div>
   <div className="input-label"><label htmlFor="conversation-text">Conversation</label><InfoTip>Analyze, review the suggestions, then save them to the graph.</InfoTip><div className="language-slot" ref={setLanguageSlot}/></div><textarea id="conversation-text" className="conversation-textarea" maxLength={8000} disabled={busy||listening} value={text} onChange={e=>{setText(e.target.value); setResult(null); setSaved(false);}} />
   <div className="conversation-input-actions"><VoiceInput languageSlot={languageSlot} disabled={busy} onListeningChange={setListening} onTranscript={part=>{setText(previous=>(previous ? `${previous.trimEnd()} ${part}` : part).slice(0,8000));setResult(null);setSaved(false);}}/>
