@@ -23,7 +23,7 @@ export function SavedContext({nodes,onRefresh,navigation}:{nodes:ContextNode[];o
  const topic=nodes.find(n=>n.kind==='topic');
  const known=new Set(['topic','message','reply',...groups.flatMap(g=>g.kinds)]);
  const sections=[...groups,{label:'Other Context',kinds:[...new Set(nodes.filter(n=>!known.has(n.kind)).map(n=>n.kind))]}];
- return <div className="saved-context"><div className="review-heading"><h3>Saved Context</h3><InfoTip>Use Revisit to correct saved context.</InfoTip><p className="saved-context-subtitle">Conversation Details</p></div>
+ return <div className="saved-context"><div className="review-heading"><h3>Saved Context</h3><InfoTip>Use Revisit to correct saved context.</InfoTip></div>
   <div className="topic-card">{topic?<SavedNode key={topic.id} node={topic} title="Topic" onRefresh={onRefresh} selected={selectedId===topic.id} onSelect={()=>setSelectedId(topic.id)}/>:<strong>Unlinked Messages</strong>}
    {sections.map(group=>{const members=nodes.filter(n=>group.kinds.includes(n.kind));if(!members.length)return null;
     const relationship=group.label==='Relationship Context';
