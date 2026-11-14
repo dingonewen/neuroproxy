@@ -19,9 +19,11 @@ Reported facts, expressed feelings and needs, and possible interpretations are k
 
 - A real Photon iMessage was sent to the developer's test iPhone, and a reply was received through the configured webhook.
 - A real inbound phone call through Photon and ElevenLabs produced a reviewable Graph on the web.
+- The developer has completed an end-to-end validation of the core delegation workflow, including reply analysis and follow-up.
+- Graph PDF export was manually checked for correctness; its visual presentation could still be improved.
 - Simulated messages and automated mock tests exercise the approval and reply pipelines without contacting a real person.
 
-The complete live message → reply → analyzed follow-up workflow and the latest Graph PDF export still need a final end-to-end check. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. The desktop interface has been redesigned; the phone layout still needs visual testing and refinement. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
+The core MVP has been validated end to end. Asynchronous voice messages are not implemented. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. The desktop interface has been redesigned; the phone layout still needs visual testing and refinement. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
 
 ## Run locally
 

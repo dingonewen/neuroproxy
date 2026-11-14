@@ -33,7 +33,7 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [ ] Check the generated people, questions, suggested action, and any draft against the spoken input.
 - [ ] Verify a short, low-pressure voice response that does not require the user to keep answering.
 - [ ] Confirm a contact, edit the draft, and explicitly approve a real message; verify no external message is sent without approval.
-- [ ] Use the same iPhone to simulate the contact's reply. Confirm the association, analyze the reply, and create a follow-up draft in the same Graph.
+- [x] Complete the end-to-end delegation workflow, including receiving and analyzing a reply and creating a follow-up draft in the same Graph (developer verified).
 - [ ] Verify persistence after restart, duplicate webhook handling, and clear labels for simulated versus real messages.
 - [ ] Record a backup demo and clearly identify live, simulated, and unverified behavior.
 
@@ -43,7 +43,8 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [x] Apply the desktop visual system to voice input, conversation review, Graph, delegation, and context recovery; the developer has reviewed the design.
 - [ ] Validate information hierarchy, text contrast, readable type, and keyboard access; test and refine mobile responsiveness.
 - [ ] Preserve the prominence of explicit approval, real-message warnings, and simulated versus real states.
-- [ ] Test the final redesigned flow on the presentation laptop and phone, including Graph PDF export and voice controls.
+- [x] Verify Graph PDF export contains the expected content (developer verified).
+- [ ] Improve the PDF layout if time permits; test the redesigned flow and voice controls on the presentation laptop and phone.
 
 ## P0/P1 — Sponsor Award: Best Voice Agent — Photon 2.0
 

@@ -11,7 +11,7 @@ NeuroProxy uses TypeScript end to end.
 Photon's published [2.0 introduction](https://photon.codes/blog/introducing-photon-2.0) documents Users, Spaces and Messages and says acceptance does not imply delivery. Check the current official competition rules before submission.
 
 
-Phone voice progress: a protected ElevenLabs webhook tool can save one proposed graph per call using the existing extractor, with no messaging permission. Live SIP provisioning, caller verification, phone context recovery, voice approval, and multi-turn graph updates remain outstanding.
+Phone voice progress: a protected ElevenLabs webhook tool can save one proposed graph per call using the existing extractor, with no messaging permission. Inbound SIP and call-to-Graph capture have been verified. Caller verification, phone context recovery, voice approval, and multi-turn graph updates remain outstanding.
 
 Hackathon demo priorities and validation status: see [CHECKLIST.md](CHECKLIST.md).
 
@@ -33,4 +33,4 @@ The demo follows this pipeline:
 - A cosine score over words is not semantic similarity. The planned embedding/BM25 work should be evaluated for paraphrases as well as meaningful differences such as negation, people, dates and boundaries.
 - Automatic telemetry can expose sensitive material. Prefer allowlisted manual spans, minimal metadata and an exporter that excludes unapproved instrumentation; a code sandbox does not replace data minimization.
 - Graph nodes include visual-only group headings, so fewer generated insights does not guarantee a small Graph. Existing duplicate nodes remain until explicitly edited or deleted.
-- Real iMessage sending and real call-to-Graph capture have been demonstrated. Live Logfire export and a full real reply-to-follow-up workflow still need verification; do not present them as verified until tested.
+- The developer has verified the complete core delegation workflow and Graph PDF content. Live Logfire export remains unverified; the PDF layout can still be polished. Asynchronous voice messages are not implemented.
