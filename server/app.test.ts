@@ -173,3 +173,15 @@ test('manual delegation stays in the chosen conversation and reuses the selected
   const taylor=store.graph().nodes.find(n=>n.kind==='person'&&n.label==='Taylor')!;assert.ok(store.graph().edges.some(e=>e.source===first.topicId&&e.target===taylor.id));
  }finally{await app.close();store.close();}
 });
+
+test('reply analysis uses the confirmed conversation and leaves graph unchanged until review', async () => {
+ const store=new Store(':memory:');let invoked=0;let seenPerson='';
+ const relationship={facts:['Alex replied'],feelings:[],needs:[],interpretations:['They may be busy'],coreQuestion:'When?',nextAction:'Ask directly'};
+ const app=createApp(store,undefined,undefined,undefined,undefined,async input=>{invoked++;seenPerson=input.person;assert.equal(input.reply,'Busy');assert.ok(input.conversation.some(n=>n.text==='Project'));assert.ok(!input.conversation.some(n=>n.text==='Unrelated'));return {relationship,suggestedReply:'When works for you?'};});
+ try {
+  const id=store.create('Project','Alex','Ask','Are you free?');store.create('Unrelated','Sam','Check','Hello');store.transition(id,'waiting_for_reply');store.reply(id,'Busy','simulated');
+  const before=store.graph();const reply=before.nodes.find(n=>n.kind==='reply'&&n.label==='Busy')!;
+  const res=await app.inject({method:'POST',url:`/api/replies/${reply.id}/analyze`});assert.equal(res.statusCode,200);assert.equal(res.json().suggestedReply,'When works for you?');assert.equal(seenPerson,'Alex');assert.equal(invoked,1);assert.deepEqual(store.graph(),before);
+  assert.equal((await app.inject({method:'POST',url:'/api/replies/not-real/analyze'})).statusCode,400);assert.equal(invoked,1);
+ } finally {await app.close();store.close();}
+});

@@ -295,6 +295,18 @@ export class Store {
       this.db.exec('COMMIT');
     } catch(error) {this.db.exec('ROLLBACK');throw error;}
   }
+  replyAnalysisContext(replyId:string) {
+    const match=this.db.prepare("SELECT d.person,d.body,n.label AS reply FROM nodes n JOIN edges e ON e.target=n.id AND e.label='reply' JOIN drafts d ON d.message_id=e.source WHERE n.id=? AND n.kind='reply' AND n.status='received' AND d.state='reply_received'").get(replyId) as {person:string;body:string;reply:string}|undefined;
+    if(!match) throw Error('Confirm and link the reply before analyzing it.');
+    const graph=this.graph();
+    const group=groupGraph(graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)})),graph.edges.map(e=>({source:String(e.source),target:String(e.target)}))).find(g=>g.id!=='unlinked' && g.nodeIds.has(replyId));
+    if(!group) throw Error('The reply is not linked to a saved conversation.');
+    const kinds=new Set(['topic','person','task','question','reported_fact','feeling','need','interpretation','core_question','suggested_action','message','reply']);
+    const nodes=graph.nodes.filter(n=>group.nodeIds.has(String(n.id)) && kinds.has(String(n.kind)));
+    const topic=nodes.filter(n=>n.kind==='topic');const recent=nodes.filter(n=>n.kind!=='topic').slice(-29);
+    const conversation=[...topic.slice(0,1),...recent].map(n=>({kind:String(n.kind),text:String(n.label).slice(0,500)}));
+    return {person:match.person,outgoingMessage:match.body,reply:match.reply,conversation};
+  }
   createReplyDraft(replyId:string, body:unknown, action:unknown) {
     if(typeof body!=='string' || !body.trim() || body.length>2000 || typeof action!=='string' || !action.trim() || action.length>500) throw Error('Enter a reply and action.');
     this.db.exec('BEGIN IMMEDIATE');

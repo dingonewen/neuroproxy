@@ -7,7 +7,8 @@ import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
 import { PhotonSender, type PhotonTarget } from './photon.ts';
 import { analysisErrorFingerprint, describeAnalysisError } from './analysis-error.ts';
 import { generateManualMessage, type ManualMessageGenerator } from './manual-message.ts';
-export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage) {
+import { analyzeReply, replyAnalysisSchema, type ReplyAnalyzer } from './reply-analysis.ts';
+export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
 app.register(async (webhook) => {
@@ -57,6 +58,11 @@ app.post('/api/extract', async (req, reply) => {
   catch (error) { const diagnosis=describeAnalysisError(error); const fingerprint=analysisErrorFingerprint(error); console.error(`Analysis failed: ${diagnosis.kind} (${fingerprint})`); return reply.code(502).send({ error: diagnosis.kind==='unknown' ? `${diagnosis.message} Diagnostic: ${fingerprint}.` : diagnosis.message, category:diagnosis.kind }); }
 });
 app.post('/api/reviewed-context', async (req) => store.createReviewed(req.body));
+app.post('/api/replies/:id/analyze', async (req,reply) => {
+  const context=store.replyAnalysisContext((req.params as {id:string}).id);
+  try {return replyAnalysisSchema.parse(await replyAnalyzer(context));}
+  catch(error){const diagnosis=describeAnalysisError(error);const fingerprint=analysisErrorFingerprint(error);console.error(`Reply analysis failed: ${diagnosis.kind} (${fingerprint})`);return reply.code(502).send({error:diagnosis.kind==='invalid_output' ? 'The model returned an invalid reply analysis. Please try again; nothing was saved.' : diagnosis.message,category:diagnosis.kind});}
+});
 app.post('/api/replies/:id/insights', async (req) => {store.addReplyInsights((req.params as {id:string}).id,req.body);return {ok:true};});
 app.post('/api/replies/:id/draft', async req => {const b=req.body as {body?:unknown;action?:unknown}|null;return store.createReplyDraft((req.params as {id:string}).id,b?.body,b?.action);});
 app.post('/api/ask', async (req) => {

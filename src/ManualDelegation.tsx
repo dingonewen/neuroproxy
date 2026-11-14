@@ -20,6 +20,6 @@ export function ManualDelegation({topicId,nodes,onSaved}:{topicId:string;nodes:I
   <div className="manual-actions"><button className="secondary-button" type="button" disabled={busy||!validPerson||!validAction} onClick={()=>void generate()}>{busy?'Working…':'Generate'}</button></div>
   <label>Message Draft<textarea maxLength={2000} value={body} onChange={e=>setBody(e.target.value)}/></label>
   <div className="manual-actions"><button className="secondary-button" type="button" disabled={busy||!validPerson||!validAction||!body.trim()} onClick={()=>void save()}>Create</button></div>
-  {notice && (notice.startsWith('No draft suggested: ') ? <p role="status" className="draft-suggestion-notice"><strong>No draft suggested:</strong> {notice.slice('No draft suggested: '.length)}</p> : <p role="status">{notice}</p>)}
+  {notice && (notice.startsWith('No draft suggested: ') ? <p role="status" className="draft-suggestion-notice"><strong>No draft suggested:</strong> {notice.slice('No draft suggested: '.length)}</p> : <p className="helper-text" role="status">{notice}</p>)}
  </details>;
 }
