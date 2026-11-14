@@ -29,6 +29,7 @@ app.register(async (webhook) => {
   });
 });
 app.get('/api/graph', async () => store.graph());
+app.patch('/api/nodes/:id', async req => {const b=req.body as {expectedLabel?:unknown;label?:unknown}|null;store.reviseNode((req.params as {id:string}).id,b?.expectedLabel,b?.label);return {ok:true};});
 app.delete('/api/conversations/:id', async req => {store.deleteConversation((req.params as {id:string}).id);return {ok:true};});
 app.get('/api/photon-inbox/:id/candidates', async req => ({candidates:store.photonCandidates((req.params as {id:string}).id)}));
 app.post('/api/photon-inbox/:id/link', async (req,reply) => {

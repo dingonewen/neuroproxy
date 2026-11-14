@@ -14,6 +14,23 @@ test('simulated delegation API persists a reply and rejects duplicate approval',
  } finally { await app.close(); store.close(); }
 });
 
+test('revisiting saved context updates the existing graph and unsent drafts safely', async () => {
+ const store=new Store(':memory:');const app=createApp(store);
+ try {
+  const created=store.createReviewed({topic:'Meeting',people:['Alex'],tasks:[{description:'Check in',assignee:'Alex'}],uncertainties:[],draft:{recipient:'Alex',taskIndex:0,body:'Hello'}});
+  const graph=store.graph();const person=graph.nodes.find(n=>n.kind==='person')!;const message=graph.nodes.find(n=>n.kind==='message')!;
+  const update=(id:unknown,expectedLabel:string,label:string)=>app.inject({method:'PATCH',url:`/api/nodes/${id}`,payload:{expectedLabel,label}});
+  assert.equal((await update(person.id,'Alex','Sam')).statusCode,200);assert.equal(store.graph().drafts[0].person,'Sam');
+  assert.equal((await update(message.id,'Hello','How are you?')).statusCode,200);assert.equal(store.graph().drafts[0].body,'How are you?');
+  assert.equal((await update(message.id,'Hello','Stale edit')).statusCode,400);assert.equal(store.graph().drafts[0].body,'How are you?');
+  store.transition(created.draftId!,'waiting_for_reply');
+  assert.equal((await update(message.id,'How are you?','Changed history')).statusCode,400);
+  assert.equal((await update(person.id,'Sam','Other name')).statusCode,400);
+  store.reply(created.draftId!,'Fine','simulated');const reply=store.graph().nodes.find(n=>n.kind==='reply')!;
+  assert.equal((await update(reply.id,'Fine','Changed reply')).statusCode,400);assert.equal(store.graph().nodes.find(n=>n.id===reply.id)?.label,'Fine');
+ }finally{await app.close();store.close();}
+});
+
 test('reviewed relationship insights stay distinct from reported facts and attach to confirmed replies', async () => {
  const store=new Store(':memory:');const app=createApp(store);
  const relationship={facts:['Alex said they are busy'],feelings:['User feels uncertain'],needs:['Clarity'],interpretations:['They may be busy, or may be declining'],coreQuestion:'Do they want to meet?',nextAction:'Ask once directly.'};

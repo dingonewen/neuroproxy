@@ -56,6 +56,32 @@ export class Store {
   node(kind: string, label: string, status = '', source = 'user') { const id = randomUUID(); this.db.prepare('INSERT INTO nodes VALUES (?,?,?,?,?)').run(id, kind, label, status, source); return id; }
   edge(source: string, target: string, label: string) { this.db.prepare('INSERT INTO edges VALUES (?,?,?,?)').run(randomUUID(), source, target, label); }
   graph() { return { nodes: this.db.prepare('SELECT * FROM nodes ORDER BY rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport FROM drafts JOIN nodes ON nodes.id=drafts.message_id ORDER BY drafts.rowid DESC').all() }; }
+  reviseNode(id:string, expectedLabel:unknown, label:unknown) {
+    if(typeof expectedLabel!=='string' || typeof label!=='string' || !label.trim()) throw Error('Enter the revised content.');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const node=this.db.prepare('SELECT kind,label FROM nodes WHERE id=?').get(id) as {kind:string;label:string}|undefined;
+      const editable=['topic','person','task','question','reported_fact','feeling','need','interpretation','core_question','suggested_action','message'];
+      if(!node || !editable.includes(node.kind)) throw Error('This node cannot be edited.');
+      if(node.label!==expectedLabel) throw Error('This content has changed. Refresh and review the latest version.');
+      const value=label.trim();if(value.length>(node.kind==='message'?2000:500)) throw Error('Revised content is too long.');
+      if(node.kind==='message') {
+        const draft=this.db.prepare('SELECT id,state FROM drafts WHERE message_id=?').get(id) as {id:string;state:string}|undefined;
+        if(!draft || draft.state!=='pending_approval') throw Error('Only an unsent draft can be edited.');
+        this.db.prepare('UPDATE drafts SET body=? WHERE id=?').run(value,draft.id);
+      }
+      if(node.kind==='person') {
+        const existing=this.db.prepare("SELECT 1 FROM drafts WHERE person_id=? AND state<>'pending_approval' LIMIT 1").get(id);
+        if(existing) throw Error('A person with message history cannot be renamed.');
+        const graph=this.graph();const groups=groupGraph(graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)})),graph.edges.map(e=>({source:String(e.source),target:String(e.target)})));
+        const group=groups.find(g=>g.nodeIds.has(id));
+        if(group && graph.nodes.some(n=>n.id!==id && n.kind==='person' && group.nodeIds.has(String(n.id)) && String(n.label).toLocaleLowerCase()===value.toLocaleLowerCase())) throw Error('People in a conversation must have distinct names.');
+        this.db.prepare('UPDATE drafts SET person=? WHERE person_id=?').run(value,id);
+      }
+      this.db.prepare('UPDATE nodes SET label=? WHERE id=?').run(value,id);
+      this.db.exec('COMMIT');
+    } catch(error) {this.db.exec('ROLLBACK');throw error;}
+  }
   deleteConversation(topicId:string) {
     this.db.exec('BEGIN IMMEDIATE');
     try {
