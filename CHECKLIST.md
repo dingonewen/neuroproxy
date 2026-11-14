@@ -37,13 +37,13 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [ ] Verify persistence after restart, duplicate webhook handling, and clear labels for simulated versus real messages.
 - [ ] Record a backup demo and clearly identify live, simulated, and unverified behavior.
 
-## P0 — LEGO-Inspired UI Redesign
+## P0 — Desktop UI Redesign (BoldKit Coral)
 
-- [ ] Establish a cohesive visual language with playful building-block forms, a clear color palette, and consistent typography.
-- [ ] Apply the visual system to the main demo flow: voice input, conversation review, Graph, delegation, and context recovery.
-- [ ] Keep information hierarchy, text contrast, readable type, keyboard access, and mobile responsiveness suitable for the target users.
+- [x] Establish a cohesive BoldKit Coral visual language with building-block forms, Inter typography, Lucide icons, and consistent controls.
+- [x] Apply the desktop visual system to voice input, conversation review, Graph, delegation, and context recovery; the developer has reviewed the design.
+- [ ] Validate information hierarchy, text contrast, readable type, and keyboard access; test and refine mobile responsiveness.
 - [ ] Preserve the prominence of explicit approval, real-message warnings, and simulated versus real states.
-- [ ] Test the redesigned flow on the presentation laptop and check the mobile layout; defer animations and secondary-screen polish if time runs short.
+- [ ] Test the final redesigned flow on the presentation laptop and phone, including Graph PDF export and voice controls.
 
 ## P0/P1 — Sponsor Award: Best Voice Agent — Photon 2.0
 
