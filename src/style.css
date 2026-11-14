@@ -304,3 +304,23 @@ section.graph{background:hsl(var(--primary) / .13)}
 .saved-context .topic-card{padding:12px}.saved-context .category-card{padding:10px}.saved-context .nested-card{padding:8px;margin:7px 0}
 @container (min-width:520px){.conversation-panel .saved-relationship-grid{display:block;columns:2;column-gap:10px}.saved-relationship-group{break-inside:avoid}}
 @media(max-width:620px){.saved-overview-grid{grid-template-columns:1fr}}
+
+/* More room for reviewed context, aligned with the central identity block. */
+.brand-hero-icon{width:clamp(76px,8vw,124px);height:auto;stroke-width:1.8;margin-bottom:18px;color:hsl(var(--foreground))}
+@media(min-width:1051px){
+ main{grid-template-rows:minmax(235px,auto) minmax(640px,calc(64vh + 141px)) minmax(1008px,120vh)}
+}
+
+/* Compact input text and keep the graph export near the panel's lower edge. */
+.conversation-input-actions{margin-top:12px}
+#conversation-text,#recovery-question{font-size:.6rem}
+section.graph{background:hsl(var(--secondary) / .15)}
+.graph-export{display:flex;justify-content:flex-start;margin-top:auto;padding-top:20px}
+.graph-export button{font-size:.75rem;padding:7px 10px}
+
+.saved-node .revisit-button{display:inline-block;background:hsl(var(--primary));color:hsl(var(--primary-foreground));border:2px solid hsl(var(--border));padding:5px 9px;margin-top:7px;font-weight:700;box-shadow:2px 2px 0 hsl(var(--shadow-color))}
+.saved-node .revisit-button:hover:not(:disabled){transform:translate(2px,2px);box-shadow:none}
+
+.saved-node .saved-node-status{font-size:.68rem}
+.react-flow__node small{font-size:.62rem}
+#conversation-text,#recovery-question{font-size:.8rem}
