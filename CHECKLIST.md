@@ -2,7 +2,26 @@
 
 Goal: deliver one reliable end-to-end demo for the Photon and Amazon sponsor awards and the Healthcare track. Checked items have been demonstrated or configured; unchecked items still require implementation or verification.
 
-## P0 — End-to-End Demo
+## Time Budget and Priority
+
+Plan for **10 hours of development** followed by **2 protected hours for debugging and demo preparation**. Times are working-time estimates, not guarantees. Start final preparation even if optional work remains.
+
+| Priority | Development focus | Budget | Exit condition |
+| --- | --- | --- | --- |
+| P0 | Phone voice → Graph | 2 h | A real call produces a reviewable Graph and a short spoken response. |
+| P0 | Approved message → reply → follow-up | 1.5 h | One real iMessage and reply are associated with the same Graph; a follow-up draft requires approval. |
+| P0 | LEGO-inspired UI redesign | 2.5 h | The main demo screens and Graph have a cohesive, distinctive visual style and remain readable. |
+| P0 | Reliability and usability | 1.5 h | Fix blocking failures, preserve state, and keep the main flow understandable. |
+| P1 | Agent reasoning and adaptation | 1 h | Demonstrate one context-aware next action based on a reviewed edit or confirmed reply. |
+| P1 | Photon outbound voice | 0.75 h | First verify sponsor requirements; if needed and feasible, test a call to the developer's own phone. Stop when the timebox ends. |
+| P1 | Healthcare positioning and submission materials | 0.75 h | Write the use case, known limits, documentation, and required submission details. |
+| P0 | Final debugging and demo preparation | 2 h | Run the full scenario, rehearse, record a backup, and submit on time. |
+
+**Final two hours:** reserve 45 minutes for an end-to-end run and blocking fixes, 30 minutes to rehearse the two-minute pitch, 30 minutes to record or verify a backup, and 15 minutes for submission checks. Adapt the split if the official deadline is sooner.
+
+**Cut order:** defer asynchronous voice messages, advanced memory or multi-agent work, visual details outside the main demo flow, and outbound voice if it is not required or cannot be completed within its timebox. Never cut contact confirmation or explicit approval for real messages.
+
+## P0 — End-to-End Demo (All Three Tracks)
 
 - [x] Analyze a conversation and produce a reviewable Cognitive Action Graph and message draft.
 - [x] Send a real Photon iMessage to the test iPhone.
@@ -14,7 +33,15 @@ Goal: deliver one reliable end-to-end demo for the Photon and Amazon sponsor awa
 - [ ] Verify persistence after restart, duplicate webhook handling, and clear labels for simulated versus real messages.
 - [ ] Record a backup demo and clearly identify live, simulated, and unverified behavior.
 
-## Sponsor Award: Best Voice Agent — Photon 2.0
+## P0 — LEGO-Inspired UI Redesign
+
+- [ ] Establish a cohesive visual language with playful building-block forms, a clear color palette, and consistent typography.
+- [ ] Apply the visual system to the main demo flow: voice input, conversation review, Graph, delegation, and context recovery.
+- [ ] Keep information hierarchy, text contrast, readable type, keyboard access, and mobile responsiveness suitable for the target users.
+- [ ] Preserve the prominence of explicit approval, real-message warnings, and simulated versus real states.
+- [ ] Test the redesigned flow on the presentation laptop and check the mobile layout; defer animations and secondary-screen polish if time runs short.
+
+## P0/P1 — Sponsor Award: Best Voice Agent — Photon 2.0
 
 - [x] Configure an inbound SIP route from the Photon number to ElevenLabs and verify the call connects.
 - [x] Attach the Graph capture tool to the voice agent and configure its authentication and Cloudflare route.
@@ -23,7 +50,7 @@ Goal: deliver one reliable end-to-end demo for the Photon and Amazon sponsor awa
 - [ ] Make call, network, and model failures clear; the agent must not claim an action succeeded when it did not.
 - [ ] Accurately explain current limits: one capture per call; no phone-based recovery of saved context or voice approval yet.
 
-## Sponsor Award: Best Practical AI Innovation — Amazon
+## P1 — Sponsor Award: Best Practical AI Innovation — Amazon
 
 - [ ] **Usefulness:** Clearly explain the target user, a concrete communication or executive-function challenge, and how NeuroProxy helps them take a next step.
 - [ ] **Agentic behavior:** Demonstrate context extraction, a suggested next action, a reviewable draft, approved real messaging, and reply tracking.
@@ -33,7 +60,7 @@ Goal: deliver one reliable end-to-end demo for the Photon and Amazon sponsor awa
 - [ ] **Creativity:** Show how an unstructured conversation becomes actionable memory and supported follow-through, using a concrete example.
 - [ ] Verify sponsor-specific eligibility and submission requirements with the organizers.
 
-## Main Track: Best Healthcare Hack
+## P1 — Main Track: Best Healthcare Hack
 
 - [ ] **Target users:** Explain the accessibility needs of neurodivergent people, including possible challenges with working memory, attention, reading, task initiation, and interpersonal communication; avoid treating all users as the same.
 - [ ] **Health and wellness use case:** Demonstrate how voice, persistent context, and supported communication can reduce the effort of managing an interpersonal situation.
@@ -42,13 +69,13 @@ Goal: deliver one reliable end-to-end demo for the Photon and Amazon sponsor awa
 - [ ] **Privacy:** Explain what is stored, which providers receive conversation data, and how a user can delete a saved conversation.
 - [ ] Confirm the Healthcare track selection and any track-specific submission requirements.
 
-## Submission and Presentation
+## P0 — Final Debugging, Submission, and Presentation
 
 - [ ] Prepare a clear README, setup steps, known limitations, and a concise explanation of what is real versus simulated.
 - [ ] Prepare a pitch and live demo that fit the event's two-minute presentation limit.
 - [ ] Verify the submission deadline, public repository requirements, applicable code and attribution rules, and sponsor opt-ins against the official event instructions.
 
-## After the MVP
+## P2 — After the MVP / Only If Time Remains
 
 - [ ] Explore asynchronous mobile voice messages: record and send a clip, then play the agent's response later without keeping a call open.
 - [ ] Add caller verification before considering phone access to saved context or voice-based approvals.
