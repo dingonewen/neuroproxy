@@ -6,7 +6,7 @@ Requirements: Node.js 24 or newer and npm. Copy `.env.example` to `.env` and fil
 
 To check Photon 2.0 Beta project access, set `PHOTON_API_KEY` and `PHOTON_PROJECT_ID` in `.env` and run `npm run check:photon`. This performs a read-only request and does not print the key or returned spaces. Success verifies access to that endpoint, not SMS activation, message delivery, or webhook configuration. `PHOTON_SMS_NUMBER` must contain your active Photon SMS number in E.164 format for real sends.
 
-Run `npm test` and `npm run build` for checks. This is not the complete demo: voice and live SMS delivery verification remain to be completed. The implementation plan is in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+Run `npm test` and `npm run build` for checks. Browser voice input and spoken context recovery are available as a prototype; live SMS delivery and phone-call voice remain to be verified. The implementation plan is in [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 Analysis sends the entered text to the configured model provider. A valid model and provider credentials are required; the app does not provide an offline extraction fallback. Analysis alone does not persist the text or create a draft. Review all suggestions before saving.
 
@@ -23,6 +23,10 @@ Real sending and reply processing have been tested with mocks but not a live SMS
 The iMessage path uses a previously received, signed `message.received` webhook for a direct iMessage conversation. For a shared line, first assign the test sender in the Photon iMessage dashboard, then send an iMessage from that identity to the number assigned to it. The webhook must reach `/api/webhooks/photon` and include the iMessage sender, receiver and direct-space snapshots. Open a pending draft, choose **iMessage**, select the received conversation, verify the identity and consent, and approve the exact message. You can customize the NeuroProxy signature before approving; the preview shows the exact text to be sent. Sending is not automatic. A Photon acceptance does not confirm delivery. The backend reuses the received conversation and sends as a reply; later incoming replies go through the existing signed webhook and graph pipeline. This path has automated mock coverage but has not yet been verified against a live Photon account.
 
 The Photon shared-line number is separate from `PHOTON_SMS_NUMBER`. Shared iMessage assignments require the person to start the conversation; they do not grant permission to message arbitrary contacts. See [Photon's Beta iMessage guide](https://photon.codes/docs/beta/get-started/imessage).
+
+## Browser voice prototype
+
+On a supported browser, choose English or 中文 and select **Start Voice** in Conversation or Recover Context. Allow microphone access, speak, then select **Stop Listening**. Review and correct the recognized text before selecting **Analyze** or **Ask NeuroProxy**. Recovery answers can be read aloud with **Read Answer**. Browser support and microphone availability vary; speech recognition may send audio to the browser's speech service. Typing remains available. Voice input does not send a message or approve any action.
 
 ## Phone voice
 
