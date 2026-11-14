@@ -26,7 +26,8 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 - [x] Analyze a conversation and produce a reviewable Cognitive Action Graph and message draft.
 - [x] Send a real Photon iMessage to the test iPhone.
 - [x] Connect an inbound call to the Photon SMS number and reach the ElevenLabs voice agent.
-- [ ] Retest phone voice → Graph: describe a fictional situation and verify that the graph, people, questions, suggested action, and any draft appear on the web.
+- [x] Verify that a real phone call can create a Graph on the web.
+- [ ] Check the generated people, questions, suggested action, and any draft against the spoken input.
 - [ ] Verify a short, low-pressure voice response that does not require the user to keep answering.
 - [ ] Confirm a contact, edit the draft, and explicitly approve a real message; verify no external message is sent without approval.
 - [ ] Use the same iPhone to simulate the contact's reply. Confirm the association, analyze the reply, and create a follow-up draft in the same Graph.
@@ -45,7 +46,8 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 
 - [x] Configure an inbound SIP route from the Photon number to ElevenLabs and verify the call connects.
 - [x] Attach the Graph capture tool to the voice agent and configure its authentication and Cloudflare route.
-- [ ] Verify the real-call tool invocation, Graph capture, and spoken summary after the latest agent update; address failures and latency.
+- [x] Verify that a real call can produce a Graph after the latest agent update.
+- [ ] Review the spoken summary and captured details; address failures and latency.
 - [ ] Confirm the sponsor's outbound-call requirements. If required, configure outbound calling and test only against the developer's own iPhone.
 - [ ] Make call, network, and model failures clear; the agent must not claim an action succeeded when it did not.
 - [ ] Accurately explain current limits: one capture per call; no phone-based recovery of saved context or voice approval yet.
@@ -68,6 +70,16 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 - [ ] **Responsible positioning:** Present NeuroProxy as a communication and accessibility aid; do not claim it diagnoses or treats a medical condition.
 - [ ] **Privacy:** Explain what is stored, which providers receive conversation data, and how a user can delete a saved conversation.
 - [ ] Confirm the Healthcare track selection and any track-specific submission requirements.
+
+## Two-Minute Demo Flow
+
+- [ ] Before judging, place a real test call with fictional data and leave the resulting Graph open. Record a backup showing the call and Graph appearing.
+- [ ] **0:00–0:15:** Introduce the target user and concrete accessibility problem.
+- [ ] **0:15–0:35:** Briefly show the prepared call recording or describe the already-verified Photon call; identify it as pre-recorded if shown.
+- [ ] **0:35–1:00:** Show the generated Graph, direct next action, and reviewable message draft.
+- [ ] **1:00–1:35:** Confirm the test contact, review the exact message, and explicitly approve a real iMessage to the developer's own iPhone.
+- [ ] **1:35–1:55:** Show the test reply in the Graph and a follow-up suggestion, or use a clearly labeled prepared result if live timing is too slow.
+- [ ] **1:55–2:00:** State the user benefit and the current limitations. Practice with a timer and avoid claiming delivery or features not demonstrated.
 
 ## P0 — Final Debugging, Submission, and Presentation
 
