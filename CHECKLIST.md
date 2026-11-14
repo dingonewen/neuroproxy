@@ -103,7 +103,7 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 ## P2 — After the MVP / Only If Time Remains
 
 - [ ] Profile Graph layout and rendering on representative data before considering WebAssembly; adopt it only if a measured bottleneck and a compatible implementation justify the added integration work.
-- [ ] Explore asynchronous mobile voice messages: record and send a clip, then play the agent's response later without keeping a call open.
+- [ ] Test asynchronous browser voice notes on iPhone: record and submit a clip, return to review the analysis, and play the device-voice summary without keeping a call open. The implementation is in place but has not yet been verified on a phone.
 - [ ] Add caller verification before considering phone access to saved context or voice-based approvals.
 - [ ] Support multiple Graph updates in one call and cross-channel continuity.
 - [ ] Consider preference learning and proactive follow-up only with user controls, opt-out, and appropriate reliability checks.

@@ -12,7 +12,8 @@ import { analysisErrorFingerprint, describeAnalysisError, safeValidationDetails 
 import { generateManualMessage, type ManualMessageGenerator } from './manual-message.ts';
 import { analyzeReply, replyAnalysisSchema, type ReplyAnalyzer } from './reply-analysis.ts';
 import { elevenLabsAgentStatus } from './elevenlabs.ts';
-export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply) {
+import { transcribeVoiceNote, type VoiceTranscriber } from './voice-note.ts';
+export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply, transcriber:VoiceTranscriber = transcribeVoiceNote) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
 app.register(async (webhook) => {
@@ -35,6 +36,28 @@ app.register(async (webhook) => {
   });
 });
 app.get('/api/graph', async () => store.graph());
+const voiceJobs=new Set<Promise<void>>();
+app.addHook('onClose',async()=>{await Promise.allSettled(voiceJobs);});
+app.register(async voice=>{
+  voice.addContentTypeParser(/^audio\/(webm|mp4|ogg|mpeg)(?:;.*)?$/i,{parseAs:'buffer',bodyLimit:8*1024*1024},(_req,body,done)=>done(null,body));
+  voice.post('/api/voice-notes',async(req,reply)=>{
+    const mime=req.headers['content-type']?.split(';')[0].toLowerCase() ?? '';
+    if(!Buffer.isBuffer(req.body)||!req.body.length) return reply.code(400).send({error:'Record a voice note first.'});
+    if(voiceJobs.size>=1) return reply.code(429).send({error:'A voice note is already being processed.'});
+    const id=store.createVoiceNote();
+    const audio=req.body;
+    const job=(async()=>{try {
+      const transcript=await transcriber(audio,mime);
+      if(!transcript.trim()||transcript.length>8000) throw new Error('Invalid transcript.');
+      const analysis=initialInsights(validateExtraction(await traceAnalysis('voice_analysis',()=>extractor(transcript.trim()))));
+      store.finishVoiceNote(id,transcript.trim(),analysis);
+    } catch(error) { console.error(`Voice note failed: ${describeAnalysisError(error).kind} (${analysisErrorFingerprint(error)})`); store.failVoiceNote(id); }})();
+    voiceJobs.add(job); void job.finally(()=>voiceJobs.delete(job));
+    return reply.code(202).send({id});
+  });
+});
+app.get('/api/voice-notes/:id',async(req,reply)=>store.voiceNote((req.params as {id:string}).id) ?? reply.code(404).send({error:'Voice note not found.'}));
+app.delete('/api/voice-notes/:id',async req=>{store.deleteVoiceNote((req.params as {id:string}).id);return {ok:true};});
 app.get('/api/voice/elevenlabs/status', async (_req,reply) => {
   const agentId=process.env.ELEVENLABS_AGENT_ID;
   if(!process.env.ELEVENLABS_API_KEY || !agentId)return {configured:false};

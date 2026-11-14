@@ -20,8 +20,14 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_message_labels (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), label TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, name TEXT NOT NULL, handle TEXT NOT NULL); CREATE TABLE IF NOT EXISTS person_contacts (person_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, contact_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS voice_captures (capture_hash TEXT PRIMARY KEY, topic_id TEXT REFERENCES nodes(id) ON DELETE SET NULL, summary TEXT NOT NULL);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS voice_notes (id TEXT PRIMARY KEY, status TEXT NOT NULL, transcript TEXT, analysis TEXT); UPDATE voice_notes SET status='interrupted' WHERE status='processing';`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS reply_insights_reviewed (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE);`);
   }
+  createVoiceNote() { const id=randomUUID(); this.db.prepare("INSERT INTO voice_notes (id,status) VALUES (?, 'processing')").run(id); return id; }
+  voiceNote(id:string) { const row=this.db.prepare('SELECT status,transcript,analysis FROM voice_notes WHERE id=?').get(id) as {status:string;transcript:string|null;analysis:string|null}|undefined; return row ? {status:row.status, transcript:row.transcript, analysis:row.analysis ? JSON.parse(row.analysis) : null} : null; }
+  finishVoiceNote(id:string,transcript:string,analysis:Extraction) { this.db.prepare("UPDATE voice_notes SET status='ready',transcript=?,analysis=? WHERE id=? AND status='processing'").run(transcript,JSON.stringify(analysis),id); }
+  failVoiceNote(id:string) { this.db.prepare("UPDATE voice_notes SET status='failed' WHERE id=? AND status='processing'").run(id); }
+  deleteVoiceNote(id:string) { this.db.prepare('DELETE FROM voice_notes WHERE id=?').run(id); }
   contacts() {return this.db.prepare('SELECT id,name,handle FROM contacts ORDER BY name COLLATE NOCASE,id').all();}
   createContact(name:unknown,handle:unknown) {
     if(typeof name!=='string'||!name.trim()||name.trim().length>100||typeof handle!=='string') throw Error('Enter a contact name and phone number or email.');
