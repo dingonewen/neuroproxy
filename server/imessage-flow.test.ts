@@ -23,12 +23,13 @@ test('signed inbound iMessage enables only an explicitly approved reply and trac
   const body=JSON.stringify(event),timestamp=String(Math.floor(Date.now()/1000)),delivery='test-delivery';const signature=createHmac('sha256',Buffer.from(secret.slice(6),'base64')).update(`${delivery}.${timestamp}.`).update(body).digest('base64');
   assert.equal((await app.inject({method:'POST',url:'/api/webhooks/photon',headers:{'content-type':'application/json','webhook-id':delivery,'webhook-timestamp':timestamp,'webhook-signature':`v1,${signature}`},payload:body})).statusCode,204);
   const sessions=(await app.inject({method:'GET',url:'/api/imessage-conversations'})).json().conversations;assert.equal(sessions.length,1);
-  const draft=store.create('Test','Me','Check','Hello');const url=`/api/drafts/${draft}/approve-photon-imessage`;const approved={nodeId:sessions[0].nodeId,approvedHandle:'+14155550123',approvedBody:labelRealSms('Hello'),consent:true};
+  const draft=store.create('Test','Me','Check','Hello');const url=`/api/drafts/${draft}/approve-photon-imessage`;const label='From NeuroProxy';const approved={nodeId:sessions[0].nodeId,approvedHandle:'+14155550123',approvedBody:labelRealSms('Hello',label),consent:true,label};
   assert.equal((await app.inject({method:'POST',url,payload:{...approved,consent:false}})).statusCode,400);
   assert.equal((await app.inject({method:'POST',url,payload:{...approved,approvedHandle:'+14155559999'}})).statusCode,400);
+  assert.equal((await app.inject({method:'POST',url,payload:{...approved,label:'From an assistant'}})).statusCode,400);
   assert.equal((await app.inject({method:'POST',url,payload:{...approved,approvedBody:'Hello'}})).statusCode,400);assert.equal(sends,0);
   const sent=await app.inject({method:'POST',url,payload:approved});assert.equal(sent.statusCode,200);assert.equal(sent.json().status,'waiting_for_reply');assert.equal(sends,1);
-  assert.equal(payload?.parentMessageId,incoming);assert.equal((payload?.content as {text:string}).text,labelRealSms('Hello'));
+  assert.equal(payload?.parentMessageId,incoming);assert.equal((payload?.content as {text:string}).text,labelRealSms('Hello',label));assert.equal(store.graph().drafts.find(d=>d.id===draft)?.message_label,label);
   assert.equal((await app.inject({method:'POST',url,payload:approved})).statusCode,400);assert.equal(sends,1);
   store.receivePhoton({eventId:'reply',messageId:'reply',spaceId:space,senderId:human,recipientId:agent,parentMessageId:null,createdAt:new Date(Date.now()+1000).toISOString(),body:'Hi back'});
   assert.equal(store.graph().drafts.find(d=>d.id===draft)?.state,'possible_reply');const reply=store.graph().nodes.find(n=>n.label==='Hi back')!;store.reviewPossibleReply(String(reply.id),true);

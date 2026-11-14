@@ -62,10 +62,10 @@ app.post('/api/ask', async (req) => {
 });
 app.post('/api/drafts', async (req) => { const b = req.body as Record<string,string>; return { id: store.create(b.topic, b.person, b.task, b.body) }; });
 app.post('/api/drafts/:id/approve-photon-phone', async (req, reply) => {
-  const b=req.body as {recipientPhone?:unknown;approvedBody?:unknown;consent?:unknown}|null;
-  if(!b || b.consent!==true || typeof b.recipientPhone!=='string' || typeof b.approvedBody!=='string') return reply.code(400).send({error:'Confirm recipient consent and approve the exact draft.'});
+  const b=req.body as {recipientPhone?:unknown;approvedBody?:unknown;consent?:unknown;label?:unknown}|null;
+  if(!b || b.consent!==true || typeof b.recipientPhone!=='string' || typeof b.approvedBody!=='string' || (b.label!==undefined && typeof b.label!=='string')) return reply.code(400).send({error:'Confirm recipient consent and approve the exact draft.'});
   const id=(req.params as {id:string}).id;
-  const reserved=store.preparePhone(id,b.recipientPhone.trim(),b.approvedBody);
+  const reserved=store.preparePhone(id,b.recipientPhone.trim(),b.approvedBody,b.label as string|undefined);
   let target: PhotonTarget;
   try { target=await photon.resolvePhone(b.recipientPhone.trim(),reserved.key); }
   catch { store.failPreparation(id); return reply.code(502).send({error:'Could not prepare the Photon SMS conversation. No SMS was sent; check number activation, API credentials, and E.164 numbers.'}); }
@@ -75,12 +75,12 @@ app.post('/api/drafts/:id/approve-photon-phone', async (req, reply) => {
   return {status:messageId ? 'waiting_for_reply' : 'send_unknown'};
 });
 app.post('/api/drafts/:id/approve-photon-imessage', async (req,reply) => {
- const b=req.body as {nodeId?:unknown;approvedHandle?:unknown;approvedBody?:unknown;consent?:unknown}|null;
- if(!b || b.consent!==true || typeof b.nodeId!=='string' || typeof b.approvedHandle!=='string' || typeof b.approvedBody!=='string') return reply.code(400).send({error:'Review the recipient and exact message and confirm consent.'});
+ const b=req.body as {nodeId?:unknown;approvedHandle?:unknown;approvedBody?:unknown;consent?:unknown;label?:unknown}|null;
+ if(!b || b.consent!==true || typeof b.nodeId!=='string' || typeof b.approvedHandle!=='string' || typeof b.approvedBody!=='string' || (b.label!==undefined && typeof b.label!=='string')) return reply.code(400).send({error:'Review the recipient and exact message and confirm consent.'});
  const target=store.imessageTarget(b.nodeId);
  if(!target || target.humanHandle!==b.approvedHandle) return reply.code(400).send({error:'The selected iMessage conversation no longer matches the approved recipient.'});
  const id=(req.params as {id:string}).id;
- const reserved=store.reservePhoton(id,target.spaceId,target.senderId,target.recipientId,b.approvedBody,target.humanHandle);
+ const reserved=store.reservePhoton(id,target.spaceId,target.senderId,target.recipientId,b.approvedBody,target.humanHandle,b.label as string|undefined);
  const messageId=await photon.send({...target,recipientPhone:target.humanHandle},reserved.body,reserved.key,target.parentMessageId);
  store.finishPhoton(id,messageId);
  return {status:messageId?'waiting_for_reply':'send_unknown'};

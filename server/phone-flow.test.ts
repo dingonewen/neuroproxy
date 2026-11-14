@@ -58,6 +58,15 @@ test('simultaneous approvals cannot send twice',async()=>{
  try {const results=await Promise.all([app.inject({method:'POST',url,payload}),app.inject({method:'POST',url,payload})]);assert.deepEqual(results.map(r=>r.statusCode).sort(),[200,400]);assert.equal(calls.filter(c=>c.path==='/messages').length,1);} finally {await app.close();store.close();}
 });
 
+test('a custom signature stays unchanged when preparation fails and is retried',()=>{
+ const store=new Store(':memory:');try {const id=store.create('Project','Alex','Check','Hello');const label='via NeuroProxy';const body=labelRealSms('Hello',label);
+  store.preparePhone(id,phone,body,label);store.failPreparation(id);
+  assert.equal(store.graph().drafts[0].message_label,label);
+  assert.throws(()=>store.preparePhone(id,phone,labelRealSms(body,'Another NeuroProxy label'),'Another NeuroProxy label'),/previously approved label/);
+  const retry=store.preparePhone(id,phone,body,label);assert.equal(retry.body,body);
+ }finally{store.close();}
+});
+
 test('ambiguous inbound messages remain unlinked and can only be attached to a matching delegation',async()=>{
  const {store,app}=setup(); const one=store.create('Project','Alex','First','When?');const two=store.create('Project','Alex','Second','When?');
  try {

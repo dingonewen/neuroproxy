@@ -14,16 +14,20 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS imessage_sessions (node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, human_handle TEXT NOT NULL, agent_handle TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_dispatches (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), space_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, status TEXT NOT NULL, photon_message_id TEXT UNIQUE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_preparations (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), recipient_phone TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, approved_at TEXT NOT NULL);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS photon_message_labels (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), label TEXT NOT NULL);`);
   }
-  preparePhone(id: string, phone: string, approvedBody: string) {
+  preparePhone(id: string, phone: string, approvedBody: string, label?:string) {
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) throw new Error('Enter the recipient number in E.164 format.');
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const draft=this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string}|undefined;
       if (!draft || !['pending_approval','preparation_failed'].includes(draft.state)) throw new Error('Draft is not awaiting approval.');
-      if (labelRealSms(draft.body)!==approvedBody) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
+      const stored=this.db.prepare('SELECT label FROM photon_message_labels WHERE draft_id=?').get(id) as {label:string}|undefined;
+      if (draft.state==='preparation_failed' && stored && stored.label!==label) throw new Error('A retry must use the previously approved label.');
+      if (labelRealSms(draft.body,label)!==approvedBody) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       if (draft.state==='preparation_failed') this.db.prepare('DELETE FROM photon_preparations WHERE draft_id=?').run(id);
       const key=randomUUID();
+      if(label) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);
       this.db.prepare('INSERT INTO photon_preparations VALUES (?,?,?,?)').run(id,phone,key,new Date().toISOString());
       this.db.prepare("UPDATE drafts SET state='preparing', body=? WHERE id=?").run(approvedBody,id);
       this.db.prepare("UPDATE nodes SET status='preparing' WHERE id=?").run(draft.task_id);
@@ -56,7 +60,7 @@ export class Store {
   }
   node(kind: string, label: string, status = '', source = 'user') { const id = randomUUID(); this.db.prepare('INSERT INTO nodes VALUES (?,?,?,?,?)').run(id, kind, label, status, source); return id; }
   edge(source: string, target: string, label: string) { this.db.prepare('INSERT INTO edges VALUES (?,?,?,?)').run(randomUUID(), source, target, label); }
-  graph() { return { nodes: this.db.prepare('SELECT * FROM nodes ORDER BY rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport FROM drafts JOIN nodes ON nodes.id=drafts.message_id ORDER BY drafts.rowid DESC').all() }; }
+  graph() { return { nodes: this.db.prepare('SELECT * FROM nodes ORDER BY rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id ORDER BY drafts.rowid DESC').all() }; }
   reviseNode(id:string, expectedLabel:unknown, label:unknown) {
     if(typeof expectedLabel!=='string' || typeof label!=='string' || !label.trim()) throw Error('Enter the revised content.');
     this.db.exec('BEGIN IMMEDIATE');
@@ -165,14 +169,15 @@ export class Store {
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
-  reservePhoton(id: string, spaceId: string, senderId: string, recipientId: string, approvedBody: string, trackingHandle?:string) {
+  reservePhoton(id: string, spaceId: string, senderId: string, recipientId: string, approvedBody: string, trackingHandle?:string, label?:string) {
     if (!/^pho_spc_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(spaceId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(senderId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(recipientId) || senderId === recipientId) throw new Error('Enter valid, distinct Photon space and user IDs.');
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const draft = this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string}|undefined;
       if (!draft || draft.state !== 'pending_approval') throw new Error('Draft is not awaiting approval.');
-      if (approvedBody !== labelRealSms(draft.body)) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
+      if (approvedBody !== labelRealSms(draft.body,label)) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
       const key = randomUUID();
+      if(label) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);
       if(trackingHandle) this.db.prepare('INSERT INTO photon_preparations VALUES (?,?,?,?)').run(id,trackingHandle,key,new Date().toISOString());
       this.db.prepare('INSERT INTO photon_dispatches VALUES (?,?,?,?,?,?,NULL)').run(id,spaceId,senderId,recipientId,key,'submitting');
       this.db.prepare("UPDATE drafts SET state='submitting', body=? WHERE id=?").run(approvedBody,id);
