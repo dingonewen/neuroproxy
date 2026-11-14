@@ -20,6 +20,7 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS photon_message_labels (draft_id TEXT PRIMARY KEY REFERENCES drafts(id), label TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, name TEXT NOT NULL, handle TEXT NOT NULL); CREATE TABLE IF NOT EXISTS person_contacts (person_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, contact_id TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS voice_captures (capture_hash TEXT PRIMARY KEY, topic_id TEXT REFERENCES nodes(id) ON DELETE SET NULL, summary TEXT NOT NULL);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS reply_insights_reviewed (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE);`);
   }
   contacts() {return this.db.prepare('SELECT id,name,handle FROM contacts ORDER BY name COLLATE NOCASE,id').all();}
   createContact(name:unknown,handle:unknown) {
@@ -106,7 +107,7 @@ export class Store {
   }
   node(kind: string, label: string, status = '', source = 'user') { const id = randomUUID(); this.db.prepare('INSERT INTO nodes VALUES (?,?,?,?,?)').run(id, kind, label, status, source); return id; }
   edge(source: string, target: string, label: string) { this.db.prepare('INSERT INTO edges VALUES (?,?,?,?)').run(randomUUID(), source, target, label); }
-  graph() { return { nodes: this.db.prepare('SELECT nodes.*, c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM nodes LEFT JOIN person_contacts pc ON pc.person_id=nodes.id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY nodes.rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label,c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id LEFT JOIN person_contacts pc ON pc.person_id=drafts.person_id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY drafts.rowid DESC').all() }; }
+  graph() { return { nodes: this.db.prepare('SELECT nodes.*, EXISTS(SELECT 1 FROM reply_insights_reviewed rir WHERE rir.reply_id=nodes.id) AS analysis_reviewed, c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM nodes LEFT JOIN person_contacts pc ON pc.person_id=nodes.id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY nodes.rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label,c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id LEFT JOIN person_contacts pc ON pc.person_id=drafts.person_id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY drafts.rowid DESC').all() }; }
   reviseNode(id:string, expectedLabel:unknown, label:unknown) {
     if(typeof expectedLabel!=='string' || typeof label!=='string' || !label.trim()) throw Error('Enter the revised content.');
     this.db.exec('BEGIN IMMEDIATE');
@@ -318,8 +319,15 @@ export class Store {
       if(!reply || !linked) throw Error('Confirm and link the reply before saving analysis.');
       const add=(kind:string,label:string,edgeLabel:string)=>{if(!label.trim())return;const id=this.node(kind,label,'reviewed','analysis');this.edge(replyId,id,edgeLabel);};
       r.facts.forEach(v=>add('reported_fact',v,'reported'));r.feelings.forEach(v=>add('feeling',v,'expressed feeling'));r.needs.forEach(v=>add('need',v,'expressed need'));r.interpretations.forEach(v=>add('interpretation',v,'possible interpretation'));add('core_question',r.coreQuestion,'core question');add('suggested_action',r.nextAction,'suggested action');
+      this.db.prepare('INSERT OR IGNORE INTO reply_insights_reviewed VALUES (?)').run(replyId);
       this.db.exec('COMMIT');
     } catch(error) {this.db.exec('ROLLBACK');throw error;}
+  }
+  replyExistingInsights(replyId:string) {
+    const graph=this.graph();
+    const group=groupGraph(graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)})),graph.edges.map(e=>({source:String(e.source),target:String(e.target)}))).find(g=>g.id!=='unlinked' && g.nodeIds.has(replyId));
+    if(!group) throw Error('The reply is not linked to a saved conversation.');
+    return graph.nodes.filter(n=>group.nodeIds.has(String(n.id)) && n.source==='analysis').map(n=>({kind:String(n.kind),text:String(n.label)}));
   }
   replyAnalysisContext(replyId:string) {
     const match=this.db.prepare("SELECT d.person,d.body,n.label AS reply FROM nodes n JOIN edges e ON e.target=n.id AND e.label='reply' JOIN drafts d ON d.message_id=e.source WHERE n.id=? AND n.kind='reply' AND n.status='received' AND d.state='reply_received'").get(replyId) as {person:string;body:string;reply:string}|undefined;

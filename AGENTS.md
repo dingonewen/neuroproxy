@@ -124,6 +124,15 @@ Example task states:
 
 Every external action should be traceable to a graph node.
 
+### Insight continuity and graph clarity
+
+- Treat replies as continuations of their existing conversation. Compare newly generated relationship insights with the existing insights for that conversation and category before proposing additions.
+- Aim for at most three distinct items per relationship list in the initial analysis and one or two genuinely new items per list in each reply analysis. These limits apply to generated suggestions; users may edit or add content during review.
+- Avoid duplicating facts, feelings, needs, interpretations, core questions, and suggested actions. Preserve meaningful differences such as changed people, dates, negation, and stated boundaries. Never silently delete existing reviewed content.
+- Organize the graph into readable, balanced layers: reported facts, expressed feelings, and expressed needs can branch in parallel, followed by possible interpretations, core questions, and suggested actions. Distinguish review order from verified causation and avoid inventing relationships between individual nodes.
+- Use existing conversation-scoped graph tools and local deterministic checks where suitable; provide the model with relevant context rather than repeatedly sending an entire history. Reuse results and avoid unnecessary model or tool calls, but retain sufficient context for accuracy and user review.
+- The current implementation uses conservative lexical cosine similarity, not semantic embeddings. If embeddings are added, evaluate thresholds and failure modes on representative examples, preserve meaningful contradictions, and provide a reliable fallback.
+
 ## Agent Tools
 
 Initial proposed tools:

@@ -8,8 +8,8 @@ test('relationship groups organize original nodes without changing stored graph'
  const before=structuredClone(graph);const result=graphHierarchy(graph);
  assert.deepEqual(graph,before);
  assert.ok(result.edges.some(e=>e.source==='topic'&&e.target==='person'&&e.label==='involves'));
- assert.ok(result.edges.some(e=>e.source==='visual-group:topic:reported'&&e.target==='fact'&&e.label==='reported'));
- assert.ok(result.edges.some(e=>e.source==='visual-group:topic:reported'&&e.target==='visual-group:topic:interpret'&&e.label==='review order'));
+ assert.ok(result.edges.some(e=>e.source==='visual-group:topic:facts'&&e.target==='fact'&&e.label==='reported'));
+ assert.ok(result.edges.some(e=>e.source==='visual-group:topic:facts'&&e.target==='visual-group:topic:interpret'&&e.label==='review order'));
  assert.ok(result.edges.some(e=>e.source==='visual-group:topic:action'&&e.target==='action'&&e.label==='suggested action'));
  assert.equal(result.nodes.filter(n=>n.kind==='group').length,4);
 });
