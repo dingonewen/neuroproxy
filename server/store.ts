@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
+import { validateExtraction, type Extraction } from '../shared/extraction.ts';
 
 export class Store {
   db: DatabaseSync;
@@ -10,6 +11,33 @@ export class Store {
   node(kind: string, label: string, status = '', source = 'user') { const id = randomUUID(); this.db.prepare('INSERT INTO nodes VALUES (?,?,?,?,?)').run(id, kind, label, status, source); return id; }
   edge(source: string, target: string, label: string) { this.db.prepare('INSERT INTO edges VALUES (?,?,?,?)').run(randomUUID(), source, target, label); }
   graph() { return { nodes: this.db.prepare('SELECT * FROM nodes').all(), edges: this.db.prepare('SELECT * FROM edges').all(), drafts: this.db.prepare('SELECT * FROM drafts ORDER BY rowid DESC').all() }; }
+  createReviewed(value: unknown) {
+    const data: Extraction = validateExtraction(value);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const topicId = this.node('topic', data.topic);
+      const people = new Map<string, string>();
+      for (const name of data.people) { const id = this.node('person', name); people.set(name, id); this.edge(topicId, id, 'involves'); }
+      const tasks = data.tasks.map((task, index) => {
+        const hasDraft = data.draft?.taskIndex === index;
+        const id = this.node('task', task.description, hasDraft ? 'pending_approval' : 'proposed');
+        this.edge(topicId, id, 'contains');
+        if (task.assignee) this.edge(people.get(task.assignee)!, id, 'assigned to');
+        return id;
+      });
+      for (const uncertainty of data.uncertainties) { const id = this.node('question', uncertainty, 'unresolved'); this.edge(topicId, id, 'unresolved'); }
+      let draftId: string | null = null;
+      if (data.draft) {
+        const { recipient, body, taskIndex } = data.draft;
+        const personId = people.get(recipient)!; const taskId = tasks[taskIndex!];
+        const messageId = this.node('message', body, 'pending_approval', 'simulated');
+        this.edge(taskId, messageId, 'draft'); this.edge(messageId, personId, 'to');
+        draftId = randomUUID();
+        this.db.prepare('INSERT INTO drafts VALUES (?,?,?,?,?,?,?)').run(draftId, recipient, body, 'pending_approval', personId, taskId, messageId);
+      }
+      this.db.exec('COMMIT'); return { topicId, draftId };
+    } catch (e) { this.db.exec('ROLLBACK'); throw e; }
+  }
   create(topic: string, person: string, task: string, body: string) {
     if (![topic, person, task, body].every(x => typeof x === 'string' && x.trim().length > 0 && x.length <= 2000)) throw new Error('Complete each field (maximum 2000 characters).');
     this.db.exec('BEGIN IMMEDIATE');
