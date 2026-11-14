@@ -20,3 +20,34 @@ export async function checkPhoton(config: PhotonConfig, request: typeof fetch = 
   return {ok:true};
  } catch { return {ok:false,reason:'network_error'}; }
 }
+
+export type PhotonTarget = { spaceId:string; senderId:string; recipientId:string; recipientPhone:string };
+const entityId = (value:string, prefix:'spc'|'usr') => new RegExp(`^pho_${prefix}_[0-7][0-9a-hjkmnp-tv-z]{25}$`).test(value);
+export class PhotonSender {
+ constructor(privateConfig: PhotonConfig, request: typeof fetch = fetch) { this.config=privateConfig; this.request=request; }
+ private config: PhotonConfig;
+ private request: typeof fetch;
+ private base() {
+  const project=this.config.projectId?.trim(); const key=this.config.apiKey?.trim();
+  if (!key || !project || !/^pho_prj_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(project) || /[\r\n]/.test(key)) throw Error('Photon credentials or project ID are not configured.');
+  return {url:`https://api.photon.codes/v1/projects/${project}`,key,project};
+ }
+ async verifyTarget(target:PhotonTarget) {
+  if (!entityId(target.spaceId,'spc') || !entityId(target.senderId,'usr') || !entityId(target.recipientId,'usr') || target.senderId===target.recipientId || !/^\+[1-9]\d{7,14}$/.test(target.recipientPhone)) throw Error('Enter valid Photon IDs and an E.164 recipient phone number.');
+  const {url,key,project}=this.base();
+  const get=async(path:string) => { const r=await this.request(url+path,{method:'GET',headers:{Authorization:`Bearer ${key}`,Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(10000)}); if(!r.ok) throw Error('Could not verify Photon conversation and recipient.'); return await r.json() as Record<string,unknown>; };
+  const [space,sender,recipient]=await Promise.all([get(`/spaces/${target.spaceId}`),get(`/users/${target.senderId}`),get(`/users/${target.recipientId}`)]);
+  const participants=space.participantIds;
+  if(space.projectId!==project || space.id!==target.spaceId || space.platform!=='sms' || space.kind!=='direct' || !Array.isArray(participants) || participants.length!==2 || !participants.includes(target.senderId) || !participants.includes(target.recipientId) || sender.projectId!==project || sender.id!==target.senderId || sender.platform!=='sms' || sender.kind!=='agent' || recipient.projectId!==project || recipient.id!==target.recipientId || recipient.platform!=='sms' || recipient.kind!=='human' || recipient.handle!==target.recipientPhone) throw Error('Photon conversation or recipient did not match the approved phone number.');
+ }
+ async send(target:PhotonTarget, body:string, key:string):Promise<string|null> {
+  const {url,key:apiKey,project}=this.base();
+  try {
+   const r=await this.request(`${url}/messages`,{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'content-type':'application/json','idempotency-key':key},body:JSON.stringify({spaceId:target.spaceId,senderId:target.senderId,content:{type:'text',format:'plain',text:body}}),redirect:'error',signal:AbortSignal.timeout(10000)});
+   if(!r.ok) return null;
+   const data=await r.json() as {id?:unknown;projectId?:unknown;space?:{id?:unknown};status?:unknown};
+   if (typeof data.id!=='string' || !/^pho_msg_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(data.id) || data.projectId!==project || data.space?.id!==target.spaceId || !['dispatched','accepted','delivered'].includes(String(data.status))) return null;
+   return data.id;
+  } catch {return null;}
+ }
+}

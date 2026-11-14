@@ -4,7 +4,8 @@ import { createAgent } from './agent.ts';
 import { extractConversation, type Extractor } from './extract.ts';
 import { validateExtraction } from '../shared/extraction.ts';
 import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
-export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }) {
+import { PhotonSender, type PhotonTarget } from './photon.ts';
+export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID})) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
 app.register(async (webhook) => {
@@ -42,6 +43,16 @@ app.post('/api/ask', async (req) => {
   return { answer: result.text };
 });
 app.post('/api/drafts', async (req) => { const b = req.body as Record<string,string>; return { id: store.create(b.topic, b.person, b.task, b.body) }; });
+app.post('/api/drafts/:id/approve-photon', async (req, reply) => {
+  const b = req.body as (PhotonTarget & {approvedBody?:unknown;consent?:unknown}) | null;
+  if (!b || b.consent !== true || typeof b.approvedBody !== 'string' || typeof b.spaceId !== 'string' || typeof b.senderId !== 'string' || typeof b.recipientId !== 'string' || typeof b.recipientPhone !== 'string') return reply.code(400).send({error:'Confirm recipient consent and approve the exact draft.'});
+  try { await photon.verifyTarget(b); } catch { return reply.code(400).send({error:'Could not verify the Photon SMS conversation and recipient.'}); }
+  const id=(req.params as {id:string}).id;
+  const reserved=store.reservePhoton(id,b.spaceId,b.senderId,b.recipientId,b.approvedBody);
+  const messageId=await photon.send(b,reserved.body,reserved.key);
+  store.finishPhoton(id,messageId);
+  return {status:messageId ? 'waiting_for_reply' : 'send_unknown'};
+});
 app.post('/api/drafts/:id/approve-simulation', async (req) => { store.transition((req.params as {id:string}).id, 'waiting_for_reply'); return { ok: true }; });
 app.post('/api/drafts/:id/cancel', async (req) => { store.transition((req.params as {id:string}).id, 'cancelled'); return { ok: true }; });
 app.post('/api/drafts/:id/simulate-reply', async (req) => { store.reply((req.params as {id:string}).id, (req.body as {body:string}).body, 'simulated'); return { ok: true }; });

@@ -27,7 +27,7 @@ const deliverySchema = z.object({
  data:z.object({ projectId:id, object:z.object({
   id, projectId:id, platform:z.string(), status:z.literal('received'),
   space:z.object({id}), sentBy:z.object({id, kind:z.string()}), receivedBy:z.object({id, kind:z.string()}),
-  content:z.object({type:z.literal('text'), text:z.string().trim().min(1).max(2000)}),
+  parentMessageId:id.nullable().optional(), content:z.object({type:z.literal('text'), text:z.string().trim().min(1).max(2000)}),
  }) }),
 });
 export function parsePhotonMessage(value: unknown, projectId: string) {
@@ -35,6 +35,6 @@ export function parsePhotonMessage(value: unknown, projectId: string) {
  if (!parsed.success) return null;
  const {data}=parsed.data; const message=data.object;
  if (data.projectId !== projectId || message.projectId !== projectId || message.sentBy.kind !== 'human' || message.receivedBy.kind !== 'agent') return null;
- return {eventId:parsed.data.id, messageId:message.id, spaceId:message.space.id, senderId:message.sentBy.id, recipientId:message.receivedBy.id, body:message.content.text};
+ return {eventId:parsed.data.id, messageId:message.id, spaceId:message.space.id, senderId:message.sentBy.id, recipientId:message.receivedBy.id, parentMessageId:message.parentMessageId ?? null, body:message.content.text};
 }
 export type PhotonMessage = NonNullable<ReturnType<typeof parsePhotonMessage>>;
