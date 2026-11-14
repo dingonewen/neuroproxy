@@ -1,3 +1,4 @@
+import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import type { Extraction } from '../shared/extraction';
 import { InfoTip } from './InfoTip';
@@ -28,7 +29,7 @@ export function ReplyInsights({replyId,person,onSaved,analyzed}:{replyId:string;
    const res=await fetch(`/api/replies/${encodeURIComponent(replyId)}/insights`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(clean)});const data=await res.json();if(!res.ok)throw Error(data.error);setAnalysisSaved(true);await onSaved();setNotice('Reviewed analysis saved to this reply in the graph.');
   }catch(e){setNotice((e as Error).message);}finally{setBusy(false);}
  }
- return <div>{!analyzed && !result && <><p className="helper-text">Analyze this reply and suggest a next message. Conversation context and messages are sent to your configured AI provider.</p><div className="reply-analysis-actions"><button type="button" disabled={busy} onClick={analyze}>{busy?'Working…':'Analyze this reply'}</button></div></>}
+ return <div>{!analyzed && !result && <><p className="helper-text">Analyze this reply and suggest a next message. Conversation context and messages are sent to your configured AI provider.</p><div className="reply-analysis-actions"><button type="button" disabled={busy} onClick={analyze}>{busy?'Working…':<><Sparkles className="button-icon" aria-hidden="true"/>Analyze this reply</>}</button></div></>}
   {result && !analysisSaved && <div className="reply-review">
    <div className="review-heading"><h3>Review Reply Analysis</h3></div>
    <div className="topic-card">

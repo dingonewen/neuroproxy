@@ -1,3 +1,4 @@
+import { MessageCircle, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Extraction } from '../shared/extraction';
 import { InfoTip } from './InfoTip';
@@ -33,10 +34,10 @@ export function ConversationInput({ onSaved, onPreview, savedNodes, showingPrevi
   } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
  }
  return <section className="conversation-panel">
-  <div className="panel-heading"><span className="eyebrow">01 / Understand</span><h2>Understand a Conversation</h2><p>Analyze, review the suggestions, then save them to the graph.</p></div>
+  <div className="panel-heading"><span className="eyebrow">01 / Understand</span><h2><MessageCircle className="heading-icon" aria-hidden="true"/>Understand a Conversation</h2><p>Analyze, review the suggestions, then save them to the graph.</p></div>
   <label>Conversation<textarea className="conversation-textarea" maxLength={8000} disabled={busy||listening} value={text} onChange={e=>{setText(e.target.value); setResult(null); setSaved(false);}} /></label>
   <div className="conversation-input-actions"><VoiceInput disabled={busy} onListeningChange={setListening} onTranscript={part=>{setText(previous=>(previous ? `${previous.trimEnd()} ${part}` : part).slice(0,8000));setResult(null);setSaved(false);}}/>
-  <div className="analyze-actions"><button className="analyze-button" type="button" disabled={busy || listening || !text.trim()} onClick={analyze}>{busy ? 'Working…' : 'Analyze'}</button></div></div>
+  <div className="analyze-actions"><button className="analyze-button" type="button" disabled={busy || listening || !text.trim()} onClick={analyze}>{busy ? 'Working…' : <><Sparkles className="button-icon" aria-hidden="true"/>Analyze</>}</button></div></div>
   {error && <p role="alert">{error}</p>}{saved && <p role="status">Saved to the graph. Any message draft still requires approval.</p>}
   {result && showingPreview && <fieldset disabled={busy} className="review"><div className="review-heading"><h3>Review Before Saving</h3><p>Correct or remove anything inaccurate.</p></div>
    <div className="topic-card" id="context-preview-topic"><label className="topic-title">Topic<input value={result.topic} onChange={e=>setResult({...result,topic:e.target.value})}/></label>
