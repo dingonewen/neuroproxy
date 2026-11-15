@@ -14,13 +14,14 @@ Plan for **10 hours of development** followed by **2 protected hours for debuggi
 | P0 | Reliability and usability | 1.5 h | Fix blocking failures, preserve state, and keep the main flow understandable. |
 | P1 | Agent reasoning and adaptation | 1 h | Demonstrate one context-aware next action based on a reviewed edit or confirmed reply. |
 | P1 | Semantic memory and hybrid retrieval | Time permitting, after P0 | Evaluate and, if feasible, demonstrate more accurate conversation-scoped deduplication and retrieval. |
-| P1 | Photon outbound voice | 0.75 h | First verify sponsor requirements; if needed and feasible, test a call to the developer's own phone. Stop when the timebox ends. |
+| P0 | Photon outbound voice | 0.75 h | Configure the Photon–ElevenLabs SIP route and verify an outbound call to the developer's own phone. |
+| P0 | Voice-to-text continuity | Time permitting within P0 | Demonstrate verified call context carried into a reviewable message without claiming unsupported memory. |
 | P1 | Healthcare positioning and submission materials | 0.75 h | Write the use case, known limits, documentation, and required submission details. |
 | P0 | Final debugging and demo preparation | 2 h | Run the full scenario, rehearse, record a backup, and submit on time. |
 
 **Final two hours:** reserve 45 minutes for an end-to-end run and blocking fixes, 30 minutes to rehearse the two-minute pitch, 30 minutes to record or verify a backup, and 15 minutes for submission checks. Adapt the split if the official deadline is sooner.
 
-**Cut order:** defer asynchronous voice messages, advanced memory or multi-agent work, visual details outside the main demo flow, and outbound voice if it is not required or cannot be completed within its timebox. Never cut contact confirmation or explicit approval for real messages.
+**Cut order:** defer asynchronous voice messages, advanced memory or multi-agent work, and visual details outside the main demo flow. Never cut recipient verification or explicit approval for real messages.
 
 The semantic memory work below is a P1 stretch goal and is not included in the original 10-hour estimates. Protect P0 and the final two hours; adjust the budget if pursuing it.
 
@@ -54,13 +55,16 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [x] Verify Graph PDF export contains the expected content (developer verified).
 - [ ] Improve the PDF layout if time permits; test the redesigned flow and voice controls on the presentation laptop and phone.
 
-## P0/P1 — Sponsor Award: Best Voice Agent — Photon 2.0
+## P0 — Sponsor Award: Best Voice Agent — Photon 2.0
 
 - [x] Configure an inbound SIP route from the Photon number to ElevenLabs and verify the call connects.
 - [x] Attach the Graph capture tool to the voice agent and configure its authentication and Cloudflare route.
 - [x] Verify that a real call can produce a Graph after the latest agent update.
 - [ ] Review the spoken summary and captured details; address failures and latency.
-- [ ] Confirm the sponsor's outbound-call requirements. If required, configure outbound calling and test only against the developer's own iPhone.
+- [x] Enable outbound calls on the Photon Voice profile and configure its SIP connection and outbound credentials in the existing ElevenLabs number.
+- [x] Place an outbound ElevenLabs test call through the Photon number to the developer's own iPhone and connect successfully (developer verified).
+- [ ] Verify caller ID, two-way audio, and call termination during the demo or an already-planned call; conserve ElevenLabs credits and avoid extra live tests.
+- [ ] Demonstrate that context captured during a call is available when preparing a text; identify any manual steps and distinguish this from automatic cross-channel memory.
 - [ ] Make call, network, and model failures clear; the agent must not claim an action succeeded when it did not.
 - [ ] Accurately explain current limits: one capture per call; no phone-based recovery of saved context or voice approval yet.
 
