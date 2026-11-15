@@ -26,7 +26,7 @@ async function waitFor(testCondition:()=>boolean){for(let i=0;i<100;i++){if(test
 
 test('authorized AutoReply sends once for a uniquely matched reply and stops on opt-out',async()=>{
  let sends=0,modelCalls=0;let preferences='';
- const request:typeof fetch=async(_url,init)=>{sends++;const body=JSON.parse(String(init?.body));assert.equal(body.content.text,'Thanks for telling me.');return Response.json({id:autoSent,projectId:project,space:{id:space},status:'dispatched'},{status:202});};
+ const request:typeof fetch=async(_url,init)=>{sends++;const body=JSON.parse(String(init?.body));assert.equal(body.content.text,'[NeuroProxy AutoReply]\nThanks for telling me.');return Response.json({id:autoSent,projectId:project,space:{id:space},status:'dispatched'},{status:202});};
  const store=new Store(':memory:');const app=createApp(store,undefined,{secret,projectId:project},new PhotonSender({apiKey:'test',projectId:project},request),undefined,async input=>{modelCalls++;preferences=input.stylePreferences??'';return {relationship,suggestedReply:'Thanks for telling me.'};});
  try {
   const {topicId,personId}=setup(store);const url=`/api/conversations/${topicId}/auto-reply`;
@@ -35,7 +35,7 @@ test('authorized AutoReply sends once for a uniquely matched reply and stops on 
   const event=signedEvent('reply1','pho_msg_00000000000000000000000004','Doing okay');
   assert.equal((await app.inject(event)).statusCode,204);await waitFor(()=>store.autoReplySettings(topicId).lastStatus==='submitted');
   assert.equal(sends,1);assert.equal(modelCalls,1);assert.equal(preferences,'Be brief');
-  const graph=store.graph();assert.equal(graph.drafts.find(d=>d.auto_generated===1)?.body,'Thanks for telling me.');
+  const graph=store.graph();assert.equal(graph.drafts.find(d=>d.auto_generated===1)?.body,'[NeuroProxy AutoReply]\nThanks for telling me.');
   assert.equal((await app.inject(event)).statusCode,204);assert.equal(sends,1);
   assert.equal((await app.inject(signedEvent('stop','pho_msg_00000000000000000000000005','Stop contacting me',autoSent))).statusCode,204);
   assert.equal(store.autoReplySettings(topicId).enabled,false);assert.equal(sends,1);assert.equal(modelCalls,1);
@@ -65,5 +65,17 @@ test('enabling AutoReply never sends a reply to an earlier message or its redeli
   assert.equal((await app.inject({method:'PUT',url:`/api/conversations/${topicId}/auto-reply`,payload:{enabled:true,personId,preferences:'',consent:true}})).statusCode,200);
   assert.equal((await app.inject(event)).statusCode,204);
   await new Promise(resolve=>setImmediate(resolve));assert.equal(modelCalls,0);assert.equal(sends,0);
+ }finally{await app.close();store.close();}
+});
+
+
+test('an auto-reply that cannot fit its disclosure is held for review',async()=>{
+ let sends=0;const request:typeof fetch=async()=>{sends++;throw Error('must not send');};
+ const store=new Store(':memory:');const app=createApp(store,undefined,{secret,projectId:project},new PhotonSender({apiKey:'test',projectId:project},request),undefined,async()=>({relationship,suggestedReply:'x'.repeat(2000)}));
+ try {
+  const {topicId,personId}=setup(store);const url=`/api/conversations/${topicId}/auto-reply`;
+  assert.equal((await app.inject({method:'PUT',url,payload:{enabled:true,personId,preferences:'',consent:true}})).statusCode,200);
+  assert.equal((await app.inject(signedEvent('long','pho_msg_00000000000000000000000008','Hello',firstSent))).statusCode,204);
+  await waitFor(()=>store.autoReplySettings(topicId).lastStatus==='needs_review');assert.equal(sends,0);
  }finally{await app.close();store.close();}
 });

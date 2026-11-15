@@ -24,8 +24,10 @@ async function processAutoReply(messageId:string) {
   try {
     const context=store.replyAnalysisContext(initial.replyId);
     const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer({...context,stylePreferences:initial.preferences})));
-    const text=analysis.suggestedReply?.trim();
-    if(!text){store.finishAutoReply(initial.replyId,'needs_review');return;}
+    const reply=analysis.suggestedReply?.trim();
+    if(!reply){store.finishAutoReply(initial.replyId,'needs_review');return;}
+    const text=`[NeuroProxy AutoReply]\n${reply}`;
+    if(text.length>2000){store.finishAutoReply(initial.replyId,'needs_review');return;}
     const current=store.autoReplyMatch(messageId);
     if(!current || current.authorizationId!==initial.authorizationId || current.personId!==initial.personId || current.spaceId!==initial.spaceId || current.senderId!==initial.senderId || current.recipientId!==initial.recipientId || current.handle.toLowerCase()!==initial.handle.toLowerCase()){store.finishAutoReply(initial.replyId,'cancelled');return;}
     const created=store.createReplyDraft(initial.replyId,text,analysis.relationship.nextAction || 'Reply');draftId=created.id;
