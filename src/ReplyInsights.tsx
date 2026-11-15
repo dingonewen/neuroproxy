@@ -34,7 +34,7 @@ export function ReplyInsights({replyId,person,onSaved,analyzed,hasFollowUp}:{rep
  }
  async function createDraft() {
   if(!suggestedReply.trim() || !action.trim())return;setBusy(true);setNotice('');
-  try {if(result)await flushProgress({stage:'suggested',relationship:result,suggestedReply,action});const res=await fetch(`/api/replies/${encodeURIComponent(replyId)}/draft`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({body:suggestedReply,action})});const data=await res.json();if(!res.ok)throw Error(data.error);latest.current=null;setSuggestedReply('');setAnalysisSaved(false);setResult(null);await onSaved();setNotice('Follow-up draft created in Messages & Drafts. Review and approve before sending.');}
+  try {if(result)await flushProgress({stage:'suggested',relationship:result,suggestedReply,action});const res=await fetch(`/api/replies/${encodeURIComponent(replyId)}/draft`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({body:suggestedReply,action})});const data=await res.json();if(!res.ok)throw Error(data.error);latest.current=null;setSuggestedReply('');setAnalysisSaved(false);setResult(null);await onSaved();setNotice('Follow-up draft created in Messages. Review and approve before sending.');}
   catch(e){setNotice((e as Error).message);}finally{setBusy(false);}
  }
  async function save() {

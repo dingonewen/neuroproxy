@@ -461,8 +461,8 @@ button.info-trigger:hover:not(:disabled){color:hsl(var(--foreground));transform:
 .manual-delegation textarea + .manual-actions{margin-top:10px}
 .end-conversation-actions{display:flex;justify-content:flex-end;margin-top:10px}
 .end-conversation-actions .end-conversation-button{background:hsl(var(--primary));color:hsl(var(--foreground));border:2px solid hsl(var(--border));box-shadow:3px 3px 0 hsl(var(--shadow-color))}
-.auto-reply-section{flex:0 0 auto;border-top:1px solid hsl(var(--border)/.2);margin-top:12px;padding-top:12px}
-.auto-reply-section>summary{cursor:pointer;font-size:.8rem;font-weight:700;line-height:1.35}
+.auto-reply-section{flex:0 1 auto;min-height:0;overflow-y:auto}
+.delegation-panel>.delegations-heading{flex:0 0 auto}
 .auto-reply-section label{font-size:.8rem;margin:8px 0}
 .auto-reply-section select,.auto-reply-section textarea{font-size:.8rem}
 .auto-reply-section textarea{min-height:46px;max-height:100px;resize:vertical}
@@ -507,3 +507,31 @@ select option[value=""],select option[value="new"],select option[value="custom"]
 @keyframes mobile-stage-from-right{from{transform:translateX(28px);opacity:.85}to{transform:translateX(0);opacity:1}}
 @keyframes mobile-stage-from-left{from{transform:translateX(-28px);opacity:.85}to{transform:translateX(0);opacity:1}}
 @media(max-width:620px) and (prefers-reduced-motion:reduce){main[data-mobile-stage] :is(#understand,#visualize,#delegate,#reconnect){transition:none;animation:none}}
+
+/* Keep draft status in the bubble and its edit action directly below. */
+.chat-message-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.chat-message-heading strong{min-width:0}
+.chat-pending-status{color:#fff;font-size:.7rem;font-weight:700;text-align:right}
+.draft-revisit-row{display:flex;justify-content:flex-end;margin:4px 0}
+.draft-actions button.draft-revisit-button{background:var(--neuroproxy-blue);color:hsl(var(--foreground));font-size:.72rem;padding:5px 9px}
+
+/* Compact contact and draft controls. */
+.chat-pending-status{-webkit-text-stroke:.8px var(--neuroproxy-blue);paint-order:stroke fill;text-shadow:0 0 1px var(--neuroproxy-blue)}
+.contact-management{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:10px}
+.contact-management details{flex:1;min-width:0;margin:0}
+.contact-management button.delete-contact{flex:none;color:hsl(var(--primary));font-size:.78rem;padding:0}
+.draft-edit-card{font-size:.8rem;line-height:1.45}
+.draft-edit-card label,.draft-edit-card textarea{font-size:.8rem}
+.draft-edit-card textarea{width:100%;resize:vertical;max-width:100%}
+.draft-edit-card .contact-actions{margin-top:8px}
+.draft-actions button.discard-draft{font-size:.78rem;color:hsl(var(--primary))}
+
+/* Entered text stays regular even inside bold labels. */
+main :is(input:not([type="checkbox"]):not([type="radio"]), textarea){font-weight:400}
+
+/* Consistent small actions and distinct voice states. */
+.draft-actions button.draft-revisit-button,.saved-node button.revisit-button{background:var(--neuroproxy-blue)!important;color:hsl(var(--foreground))!important}
+.manual-delegation .manual-actions button{font-size:.72rem;padding:5px 9px}
+.conversation-panel .voice-input button.voice-switch[aria-checked="false"]{background:var(--neuroproxy-blue)!important}
+.recovery-panel .voice-input button.voice-switch[aria-checked="false"]{background:hsl(var(--secondary))!important}
+.conversation-panel .voice-input button.voice-switch[aria-checked="true"],.recovery-panel .voice-input button.voice-switch[aria-checked="true"]{background:hsl(var(--primary))!important}
