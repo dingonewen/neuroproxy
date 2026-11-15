@@ -139,13 +139,13 @@ app.post('/api/drafts/:id/approve-photon-phone', async (req, reply) => {
   return {status:messageId ? 'waiting_for_reply' : 'send_unknown'};
 });
 app.post('/api/drafts/:id/approve-photon-imessage', async (req,reply) => {
- const b=req.body as {nodeId?:unknown;approvedHandle?:unknown;approvedBody?:unknown;consent?:unknown;label?:unknown}|null;
- if(!b || b.consent!==true || typeof b.nodeId!=='string' || typeof b.approvedHandle!=='string' || typeof b.approvedBody!=='string' || (b.label!==undefined && typeof b.label!=='string')) return reply.code(400).send({error:'Review the recipient and exact message and confirm consent.'});
+ const b=req.body as {nodeId?:unknown;approvedHandle?:unknown;approvedBody?:unknown;consent?:unknown;label?:unknown;introduce?:unknown}|null;
+ if(!b || b.consent!==true || typeof b.nodeId!=='string' || typeof b.approvedHandle!=='string' || typeof b.approvedBody!=='string' || (b.label!==undefined && typeof b.label!=='string') || (b.introduce!==undefined && typeof b.introduce!=='boolean')) return reply.code(400).send({error:'Review the recipient and exact message and confirm consent.'});
  const target=store.imessageTarget(b.nodeId);
  if(!target || target.humanHandle!==b.approvedHandle) return reply.code(400).send({error:'The selected iMessage conversation no longer matches the approved recipient.'});
  const id=(req.params as {id:string}).id;
  store.assertDraftConversationOpen(id);
- const reserved=store.reservePhoton(id,target.spaceId,target.senderId,target.recipientId,b.approvedBody,target.humanHandle,b.label as string|undefined);
+ const reserved=store.reservePhoton(id,target.spaceId,target.senderId,target.recipientId,b.approvedBody,target.humanHandle,b.label as string|undefined,b.introduce as boolean|undefined);
  const messageId=await photon.send({...target,recipientPhone:target.humanHandle},reserved.body,reserved.key,target.parentMessageId);
  store.finishPhoton(id,messageId);
  return {status:messageId?'waiting_for_reply':'send_unknown'};

@@ -38,7 +38,9 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [ ] Verify persistence after restart, duplicate webhook handling, and clear labels for simulated versus real messages.
 - [ ] Record a backup demo and clearly identify live, simulated, and unverified behavior.
 
-## P0 — Real SMS Setup and Verification
+## Deferred — Real SMS Setup and Verification
+
+The developer deferred campaign registration after the Photon dashboard showed a $20 charge. Use the verified iMessage channel for the demo; do not claim live SMS delivery.
 
 - [ ] Ask Photon which SMS campaign purpose matches user-approved personal messages and whether a test-only path is available for the developer's own phone.
 - [ ] Confirm how recipient consent and STOP opt-outs are handled, including whether Photon blocks subsequent sends; implement any required handling before claiming it works.

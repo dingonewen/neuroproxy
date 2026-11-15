@@ -1,5 +1,12 @@
 export const NEUROPROXY_LABEL = '— Sent with assistance from NeuroProxy';
 export const DEFAULT_CUSTOM_LABEL = '✦ Written with NeuroProxy';
+export const NEUROPROXY_INTRODUCTION = 'Hi, I’m NeuroProxy, helping with this message.';
+
+export function formatImessage(body:string, introduce:boolean):string {
+  const text=body.trimEnd();
+  return introduce && !text.startsWith(NEUROPROXY_INTRODUCTION)
+    ? `${NEUROPROXY_INTRODUCTION}\n\n${text}` : text;
+}
 
 export function validMessageLabel(label:unknown): label is string {
   return typeof label==='string' && label.length<=120;

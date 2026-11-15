@@ -5,11 +5,23 @@ import { createHmac } from 'node:crypto';
 import { createApp } from './app.ts';
 import { Store } from './store.ts';
 import { PhotonSender } from './photon.ts';
-import { labelRealSms } from '../shared/sms.ts';
+import { formatImessage, labelRealSms } from '../shared/sms.ts';
 import { parsePhotonMessage } from './photon-webhook.ts';
 
 const project='pho_prj_00000000000000000000000001',space='pho_spc_00000000000000000000000001',agent='pho_usr_00000000000000000000000001',human='pho_usr_00000000000000000000000002',incoming='pho_msg_00000000000000000000000001',outgoing='pho_msg_00000000000000000000000002';
 const secret='whsec_'+Buffer.alloc(32,7).toString('base64');
+test('iMessage introduction matches the approved message and cannot be changed silently',()=>{
+ const store=new Store(':memory:');
+ try {
+  const first=store.create('Topic','Alex','Ask','Hello');bindTestContact(store,first);
+  const full=formatImessage('Hello',true);
+  assert.throws(()=>store.reservePhoton(first,space,agent,human,'Hello','+14155550123','',true),/approved text/);
+  assert.throws(()=>store.reservePhoton(first,space,agent,human,full,'+14155550123','signature',true),/introduction/);
+  assert.equal(store.reservePhoton(first,space,agent,human,full,'+14155550123','',true).body,full);
+  const second=store.create('Other','Alex','Ask','Hello');bindTestContact(store,second);
+  assert.equal(store.reservePhoton(second,space,agent,human,'Hello','+14155550123','',false).body,'Hello');
+ }finally{store.close();}
+});
 test('group or incomplete iMessage snapshots do not become sendable conversations',()=>{
  const event={id:'e',type:'message.received',data:{projectId:project,object:{id:incoming,projectId:project,platform:'imessage',status:'received',space:{id:space,platform:'imessage',kind:'group'},sentBy:{id:human,kind:'human',platform:'imessage',handle:'+14155550123'},receivedBy:{id:agent,kind:'agent',platform:'imessage',handle:'+14155550124'},content:{type:'text',text:'ping'}}}};
  assert.equal(parsePhotonMessage(event,project)?.imessage,undefined);

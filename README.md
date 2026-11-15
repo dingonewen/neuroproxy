@@ -10,7 +10,7 @@ The prototype is an accessibility and communication aid. It does not diagnose or
 
 1. **Hear the Meaning:** Type, use browser speech recognition, or call the Photon voice number to capture a conversation. The agent extracts people, questions, tasks, relationship context, and a possible message draft.
 2. **See the Bigger Picture:** Review and save the context, then explore the Graph. Choose a saved conversation, select nodes, zoom, and export the Graph as a PDF. The review-order headings do not establish causation.
-3. **Make Things Happen:** Select and verify a contact, then review or edit a draft. A real iMessage or SMS is sent only after explicit approval and recipient consent. Incoming replies can be linked and analyzed to suggest a follow-up.
+3. **Make Things Happen:** Select and verify a contact, then review or edit a draft before approving a real message. Incoming replies can be linked and analyzed to suggest a follow-up.
 4. **Find Your Way Back:** Ask questions about saved context; supported browsers can also read answers aloud.
 
 Reported facts, expressed feelings and needs, and possible interpretations are kept distinct. The user can correct suggestions. Generated relationship insights are limited and compared with existing same-category entries using conservative **lexical** cosine similarity; this is not semantic embedding or vector search.
@@ -54,7 +54,8 @@ npm run build
 
 ## Messaging and contacts
 
-Add or select a locally stored contact with an E.164 number or iMessage email; the app does not import the phone's address book. A pending draft offers SMS or iMessage review. Customize or remove the message signature, verify the exact recipient and text, and explicitly approve each real send. Never contact an unconsenting recipient.
+Add or select a locally stored contact with an E.164 number or iMessage email; the app does not import the phone's address book. A pending draft opens iMessage review once a contact is selected. SMS sending is not exposed in the demo interface while campaign registration remains unresolved. Choose whether to introduce NeuroProxy, verify the exact recipient and text in the message bubble, and explicitly approve each real send. Never contact an unconsenting recipient.
+
 
 For a Photon iMessage shared line, the recipient must first be assigned a shared-line number and send a message to it; NeuroProxy can then use the signed inbound event to locate the direct conversation. A shared-line assignment does not itself imply consent. See [Photon's Beta iMessage guide](https://photon.codes/docs/beta/get-started/imessage).
 

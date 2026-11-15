@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { validateExtraction, relationshipSchema, type Extraction } from '../shared/extraction.ts';
 import type { PhotonMessage } from './photon-webhook.ts';
 import { groupGraph } from '../shared/graph-groups.ts';
-import { labelRealSms } from '../shared/sms.ts';
+import { formatImessage, labelRealSms } from '../shared/sms.ts';
 import { replyProgressSchema, type ReplyProgress } from '../shared/reply-progress.ts';
 
 const eventHash=(value:string)=>createHash('sha256').update(value).digest('hex');
@@ -258,14 +258,16 @@ export class Store {
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
-  reservePhoton(id: string, spaceId: string, senderId: string, recipientId: string, approvedBody: string, trackingHandle?:string, label?:string) {
+  reservePhoton(id: string, spaceId: string, senderId: string, recipientId: string, approvedBody: string, trackingHandle?:string, label?:string, introduce?:boolean) {
     if (!/^pho_spc_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(spaceId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(senderId) || !/^pho_usr_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(recipientId) || senderId === recipientId) throw new Error('Enter valid, distinct Photon space and user IDs.');
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const draft = this.db.prepare('SELECT * FROM drafts WHERE id=?').get(id) as {state:string;body:string;task_id:string;message_id:string;person_id:string}|undefined;
       if (!draft || draft.state !== 'pending_approval') throw new Error('Draft is not awaiting approval.');
       this.requireContact(draft.person_id,trackingHandle);
-      if (approvedBody !== labelRealSms(draft.body,label)) throw new Error('The approved text does not match this draft and its NeuroProxy label.');
+      const expected=introduce===undefined ? labelRealSms(draft.body,label) : formatImessage(draft.body,introduce);
+      if (introduce!==undefined && label!=='') throw new Error('The introduction cannot be combined with a signature.');
+      if (approvedBody !== expected) throw new Error('The approved text does not match this draft and its selected introduction.');
       const key = randomUUID();
       if(label!==undefined) this.db.prepare('INSERT OR REPLACE INTO photon_message_labels VALUES (?,?)').run(id,label);
       if(trackingHandle) this.db.prepare('INSERT INTO photon_preparations VALUES (?,?,?,?)').run(id,trackingHandle,key,new Date().toISOString());
