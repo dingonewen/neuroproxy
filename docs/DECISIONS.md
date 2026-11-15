@@ -62,11 +62,11 @@ For the motivation behind NeuroProxy, see [Vision](VISION.md). For the current i
 
 ## Context Deduplication and Retrieval
 
-**Decision:** Use conservative lexical cosine similarity to reduce repeated relationship insights. Defer semantic embeddings, BM25, and a dedicated vector database.
+**Decision:** Use lexical cosine similarity as the baseline, with optional Cloudflare embeddings for same-category reply-insight matching and local BM25 ranking for recovery. Defer a dedicated vector database.
 
 **Why:** I wanted a smaller, clearer Graph without adding infrastructure during the hackathon. Word-based similarity is useful as a simple baseline, but it is not semantic understanding and can miss paraphrases or overlook meaningful differences.
 
-**Revisit when:** An evaluation set shows where the current approach fails and a candidate retrieval method improves results enough to justify its privacy, cost, and operational complexity. Any indexes must remain scoped appropriately and support deletion with the source conversation.
+**Revisit when:** An evaluation set shows where the current approach fails and a candidate retrieval method improves results enough to justify its privacy, cost, and operational complexity. The Cloudflare integration and quality improvement still require live verification; Chinese insight deduplication currently remains lexical. Any indexes must remain scoped appropriately and support deletion with the source conversation.
 
 ## Personalization Before Model Training
 

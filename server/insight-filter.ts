@@ -29,3 +29,36 @@ export function filterInsights(relationship:Relationship, existing:Insight[], li
  return result;
 }
 export function initialInsights(data:Extraction):Extraction {return data.relationship?{...data,relationship:filterInsights(data.relationship,[],3)}:data;}
+
+// Semantic removal is intentionally strict: preserve protected details and names.
+function protectedDetails(text:string) {
+ const negation=text.toLocaleLowerCase().match(/\b(?:not|no|never|cannot|can't|won't|didn't|doesn't|isn't|don't|without|i|me|my|you|your|he|him|she|her|they|them|we|us|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d+)\b/gu) ?? [];
+ const names=text.match(/\b[A-Z][a-z]{2,}\b/g)?.filter(x=>!['The','This','That','They','Their','There','When','What','How','Why','And','But','She','Her','You','Your','His','Him'].includes(x)) ?? [];
+ return [...negation,...names.map(n=>n.toLowerCase())].sort().join('|');
+}
+function vectorCosine(a:number[],b:number[]) {
+ let dot=0,x=0,y=0;for(let i=0;i<a.length;i++){dot+=a[i]*b[i];x+=a[i]*a[i];y+=b[i]*b[i];}return x && y ? dot/Math.sqrt(x*y) : 0;
+}
+
+/** Optional high-threshold semantic deduplication, constrained to same category. */
+export async function semanticFilterInsights(relationship:Relationship,existing:Insight[],limit:number,embed:import('./embeddings.ts').Embedder|null):Promise<Relationship> {
+ const lexical=filterInsights(relationship,existing,limit);
+ if(!embed)return lexical;
+ const keys=['facts','feelings','needs','interpretations'] as const;
+ const entries:{kind:string;text:string;candidate:boolean}[]=[];
+ for(const key of keys){for(const x of existing.filter(x=>x.kind===kinds[key] && !/\p{Script=Han}/u.test(x.text)).slice(-12))entries.push({...x,candidate:false});for(const text of lexical[key])if(text.trim() && !/\p{Script=Han}/u.test(text))entries.push({kind:kinds[key],text,candidate:true});}
+ if(entries.length<2 || entries.length>64)return lexical;
+ try {
+  const vectors=await embed(entries.map(e=>e.text));
+  if(vectors.length!==entries.length || !vectors.length || vectors.some(v=>v.length!==vectors[0].length || !v.length || v.some(n=>!Number.isFinite(n))))return lexical;
+  const suppressed=new Set<string>();
+  for(let i=0;i<entries.length;i++){
+   const candidate=entries[i];if(!candidate.candidate || /\p{Script=Han}/u.test(candidate.text))continue;
+   for(let j=0;j<i;j++){
+    const prev=entries[j];if(prev.kind!==candidate.kind || suppressed.has(`${prev.kind}\0${prev.text}`) || /\p{Script=Han}/u.test(prev.text))continue;
+    if(candidate.text.trim().split(/\s+/u)[0].toLocaleLowerCase()===prev.text.trim().split(/\s+/u)[0].toLocaleLowerCase() && protectedDetails(candidate.text)===protectedDetails(prev.text) && vectorCosine(vectors[i],vectors[j])>=0.97){suppressed.add(`${candidate.kind}\0${candidate.text}`);break;}
+   }
+  }
+  const result={...lexical};for(const key of keys)result[key]=lexical[key].filter(text=>!suppressed.has(`${kinds[key]}\0${text}`));return result;
+ }catch{return lexical;}
+}

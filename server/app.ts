@@ -1,5 +1,6 @@
 import { traceAnalysis } from './telemetry.ts';
-import { filterInsights, initialInsights } from './insight-filter.ts';
+import { initialInsights, semanticFilterInsights } from './insight-filter.ts';
+import { cloudflareEmbedder } from './embeddings.ts';
 import Fastify from 'fastify';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Store } from './store.ts';
@@ -120,7 +121,7 @@ app.post('/api/replies/:id/analyze', async (req,reply) => {
   const existing=store.replyProgress(id);if(existing)return existing;
   try {
     let job=replyAnalysisJobs.get(id);
-    if(!job){job=(async()=>{const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer(context)));store.assertConversationOpen(id);const relationship=filterInsights(analysis.relationship,store.replyExistingInsights(id),2);return store.startReplyProgress(id,relationship,analysis.suggestedReply,context.person);})();replyAnalysisJobs.set(id,job);void job.then(()=>replyAnalysisJobs.delete(id),()=>replyAnalysisJobs.delete(id));}
+    if(!job){job=(async()=>{const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer(context)));store.assertConversationOpen(id);const relationship=await semanticFilterInsights(analysis.relationship,store.replyExistingInsights(id),2,cloudflareEmbedder());store.assertConversationOpen(id);return store.startReplyProgress(id,relationship,analysis.suggestedReply,context.person);})();replyAnalysisJobs.set(id,job);void job.then(()=>replyAnalysisJobs.delete(id),()=>replyAnalysisJobs.delete(id));}
     return await job;
   }
   catch(error){const diagnosis=describeAnalysisError(error);const fingerprint=analysisErrorFingerprint(error);console.error(`Reply analysis failed: ${diagnosis.kind} (${fingerprint})${diagnosis.kind==='invalid_output' ? ` [${safeValidationDetails(error)}]` : ''}`);return reply.code(502).send({error:diagnosis.kind==='invalid_output' ? 'The model returned an invalid reply analysis. Please try again; nothing was saved.' : diagnosis.message,category:diagnosis.kind});}
@@ -134,7 +135,7 @@ app.post('/api/ask', async (req) => {
   const question = (req.body as {question?:unknown})?.question;
   if (typeof question !== 'string' || !question.trim() || question.length > 2000) throw new Error('Enter a question (maximum 2000 characters).');
   if (!process.env.NEUROPROXY_MODEL) throw new Error('Set NEUROPROXY_MODEL and the provider credentials to use context recovery.');
-  const result = await createAgent(store).generate(question, { maxSteps: 5 });
+  const result = await createAgent(store,question).generate(question, { maxSteps: 5 });
   return { answer: result.text };
 });
 app.post('/api/drafts', async (req) => { const b = req.body as Record<string,string>; return { id: store.create(b.topic, b.person, b.task, b.body) }; });

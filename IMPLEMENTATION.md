@@ -34,3 +34,9 @@ The demo follows this pipeline:
 - Automatic telemetry can expose sensitive material. Prefer allowlisted manual spans, minimal metadata and an exporter that excludes unapproved instrumentation; a code sandbox does not replace data minimization.
 - Graph nodes include visual-only group headings, so fewer generated insights does not guarantee a small Graph. Existing duplicate nodes remain until explicitly edited or deleted.
 - The developer has verified the complete core delegation workflow and Graph PDF content. Live Logfire export remains unverified; the PDF layout can still be polished. Asynchronous voice messages are not implemented.
+
+## Recovery ranking and optional semantic deduplication
+
+Recall ranks complete conversation groups with local BM25, retaining all groups and their original message links. AutoReply job states and available incoming/preparation timestamps are exposed to the read-only Graph tool, which must distinguish Photon acceptance from delivery. The system cannot infer when the user was away.
+
+For reply analysis only, optional Cloudflare Workers AI BGE-M3 embeddings compare same-category insight text within the same conversation. A strict threshold and protected-detail checks reduce, but cannot eliminate, false merges; Chinese text and provider failures fall back to lexical matching. Vectors are not stored. Initial extraction remains lexical. Mock tests cover request validation and fallback; no live Cloudflare evaluation or quality improvement has been verified.

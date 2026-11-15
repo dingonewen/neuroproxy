@@ -13,7 +13,7 @@ The prototype is an accessibility and communication aid. It does not diagnose or
 3. **Make Things Happen:** Use Delegation to choose a person and action and generate a draft. In Messages, review or edit the draft, select a recipient, confirm their identity and consent, and approve the real message. Incoming replies can be analyzed to suggest a follow-up. AutoReply can be enabled separately for an eligible iMessage conversation; its live behavior has not yet been manually verified.
 4. **Find Your Way Back:** Ask questions about saved context; supported browsers can also read answers aloud.
 
-Reported facts, expressed feelings and needs, and possible interpretations are kept distinct. The user can correct suggestions. Generated relationship insights are limited and compared with existing same-category entries using conservative **lexical** cosine similarity; this is not semantic embedding or vector search.
+Reported facts, expressed feelings and needs, and possible interpretations are kept distinct. The user can correct suggestions. Generated relationship insights are limited and compared with existing same-category entries using conservative **lexical** cosine similarity. Reply analysis can additionally use optional Cloudflare embeddings for high-threshold semantic deduplication; initial extraction remains lexical. Semantic matching currently falls back to lexical matching for Chinese text and on provider errors. This is not vector-database search.
 
 ## What has been verified
 
@@ -72,6 +72,8 @@ Select a saved conversation and use **Delete** to remove its local graph, drafts
 
 **Suggested delegation:** Delegate reuses the suggested action saved in the conversation and preselects the person when there is only one. You can change the action or recipient and generate a message draft for separate approval. If analysis already suggested a message, its draft appears in Messages. Generating a message sends the saved conversation to the configured AI provider.
 
+**Recovery and AutoReply history:** Recall ranks saved conversation groups locally using BM25, while retaining all groups as context. The read-only Graph tool exposes recorded AutoReply state, incoming-reply time when available, and dispatch preparation time; Photon acceptance is not delivery confirmation. Stored timestamps do not establish when the user was away. The tool may still miss details or misunderstand a question, so verify its summary against Messages.
+
 **Reply progress:** Reply analysis and in-progress follow-up text are saved in the local SQLite database so the user can return to them from another browser connected to the same backend. Saving the reviewed analysis to the Graph and creating or sending a message remain separate actions. Creating the follow-up draft removes the temporary reply progress; deleting the conversation also deletes it. Earlier analyses created before this feature may not have a saved suggestion.
 
 **Private phone access:** `localhost` on an iPhone points to the phone itself. To reach the laptop, use a separate HTTPS hostname protected by a Cloudflare Access application with a policy limited to your own account. Set `NEUROPROXY_WEB_HOST` to that exact hostname and restart Vite, then route the hostname through the tunnel to `http://127.0.0.1:5173`. Keep the existing provider webhook hostname and its path restrictions separate. Vite's allowed-host setting is not authentication: do not create an unprotected public route to the app or its API. The laptop and tunnel must remain running.
@@ -94,7 +96,7 @@ To configure the bridge:
 
 ## Privacy and observability
 
-Analysis, draft generation, reply analysis, and recovery send the relevant entered or saved context to the configured AI provider. The voice provider receives call audio and the account submitted to its tool. Data is stored locally in SQLite; deleting a conversation removes its associated local graph and message records as described above. Use synthetic data in demos.
+Analysis, draft generation, reply analysis, and recovery send the relevant entered or saved context to the configured AI provider. When `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_AI_TOKEN` are set, reply-insight deduplication also sends selected insight text from the same conversation to Cloudflare Workers AI BGE-M3. Embeddings are held in memory and are not stored; an unavailable or invalid provider response falls back to lexical matching. The Cloudflare integration is optional and has not been verified against a live account. The voice provider receives call audio and the account submitted to its tool. Data is stored locally in SQLite; deleting a conversation removes its associated local graph and message records as described above. Use synthetic data in demos.
 
 OpenTelemetry analysis tracing is optional. Set `LOGFIRE_TOKEN` in the ignored `.env` file and, if needed, `LOGFIRE_BASE_URL` for the correct region. Restart the backend after changes. With no token, no traces are exported. The application exports only its allowlisted manual analysis spans, with status, timing, and safe diagnostic categories; it does not intentionally include conversation text, contact details, credentials, or raw provider errors. Live Logfire export still needs verification.
 
