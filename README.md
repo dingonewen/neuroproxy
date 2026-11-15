@@ -22,9 +22,10 @@ Reported facts, expressed feelings and needs, and possible interpretations are k
 - An outbound ElevenLabs test call through the Photon number connected to the developer's own iPhone. Caller ID, two-way audio, and call termination have not yet been separately verified.
 - The developer has completed an end-to-end validation of the core delegation workflow, including reply analysis and follow-up.
 - Graph PDF export was manually checked for correctness; its visual presentation could still be improved.
+- The developer has reviewed the mobile interface and its swipe navigation between workflow sections.
 - Simulated messages and automated mock tests exercise the approval and reply pipelines without contacting a real person.
 
-The core MVP has been validated end to end. The phone layout still needs visual testing and refinement. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
+The core MVP has been validated end to end. The mobile interface has been reviewed, though the final demo flow still needs a rehearsal. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
 
 ## Run locally
 
@@ -72,6 +73,8 @@ Select a saved conversation and use **Delete** to remove its local graph, drafts
 **Reply progress:** Reply analysis and in-progress follow-up text are saved in the local SQLite database so the user can return to them from another browser connected to the same backend. Saving the reviewed analysis to the Graph and creating or sending a message remain separate actions. Creating the follow-up draft removes the temporary reply progress; deleting the conversation also deletes it. Earlier analyses created before this feature may not have a saved suggestion.
 
 **Private phone access:** `localhost` on an iPhone points to the phone itself. To reach the laptop, use a separate HTTPS hostname protected by a Cloudflare Access application with a policy limited to your own account. Set `NEUROPROXY_WEB_HOST` to that exact hostname and restart Vite, then route the hostname through the tunnel to `http://127.0.0.1:5173`. Keep the existing provider webhook hostname and its path restrictions separate. Vite's allowed-host setting is not authentication: do not create an unprotected public route to the app or its API. The laptop and tunnel must remain running.
+
+On mobile, the four workflow sections share the desktop's Coral theme and are shown one at a time. Use the colored tabs or swipe horizontally outside interactive controls to switch sections; scroll vertically within a section. Graph gestures stay on the canvas, and selecting a graph node opens the related section.
 
 **Browser:** On a supported browser, choose a language and turn on the voice switch in Hear the Meaning or Find Your Way Back. Allow microphone access, speak, and turn the switch off before reviewing the recognized text. Browser speech recognition may send audio to the browser's speech provider. Voice input does not send or approve messages.
 

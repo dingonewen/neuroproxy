@@ -48,9 +48,10 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 
 ## P0 — Desktop UI Redesign (BoldKit Coral)
 
-- [x] Establish a cohesive BoldKit Coral visual language with building-block forms, Inter typography, Lucide icons, and consistent controls.
+- [x] Establish a cohesive BoldKit Coral visual language with building-block forms, Outfit Variable typography, Lucide icons, and consistent controls.
 - [x] Apply the desktop visual system to voice input, conversation review, Graph, delegation, and context recovery; the developer has reviewed the design.
-- [ ] Validate information hierarchy, text contrast, readable type, and keyboard access; test and refine mobile responsiveness.
+- [x] Review the mobile layout, swipe navigation, and colored section tabs (developer reviewed).
+- [ ] Validate information hierarchy, text contrast, readable type, and keyboard access.
 - [ ] Preserve the prominence of explicit approval, real-message warnings, and simulated versus real states.
 - [x] Verify Graph PDF export contains the expected content (developer verified).
 - [ ] Improve the PDF layout if time permits; test the redesigned flow and voice controls on the presentation laptop and phone.
