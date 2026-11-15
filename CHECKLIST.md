@@ -104,7 +104,10 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 
 - [ ] Strengthen privacy: minimize provider context, clearly disclose data sharing and deletion scope, verify Logfire excludes sensitive content, and review provider retention and local data protection. Evaluate sandboxing only where executable tools or file access require isolation.
 - [ ] Profile Graph layout and rendering on representative data before considering WebAssembly; adopt it only if a measured bottleneck and a compatible implementation justify the added integration work.
-- [ ] Test asynchronous browser voice notes on iPhone: record and submit a clip, return to review the analysis, and play the device-voice summary without keeping a call open. The implementation is in place but has not yet been verified on a phone.
 - [ ] Add caller verification before considering phone access to saved context or voice-based approvals.
 - [ ] Support multiple Graph updates in one call and cross-channel continuity.
 - [ ] Consider preference learning and proactive follow-up only with user controls, opt-out, and appropriate reliability checks.
+
+## P3 — Visual Polish
+
+- [ ] Explore animating a small square along the title's brain icon, with a reduced-motion alternative.

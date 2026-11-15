@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import type { Extraction } from '../shared/extraction';
 import { InfoTip } from './InfoTip';
 import { InsightReviewField } from './InsightReviewField';
+import { EmptyCurve } from './EmptyCurve';
 import { SavedContext } from './SavedContext';
 import { optionLabel } from './option-label';
 import { VoiceInput } from './VoiceInput';
-import { VoiceNote } from './VoiceNote';
 
 export function ConversationInput({ onSaved, onPreview, savedNodes, showingPreview, navigation, onRefresh }: { onSaved: (topicId:string, context:Extraction, draftId:string|null) => Promise<void>; onPreview:(result:Extraction|null)=>void; savedNodes:{id:string;kind:string;label:string;status:string;source:string;contact_id?:string|null;contact_name?:string|null;contact_handle?:string|null}[]; showingPreview:boolean; navigation:{id:string;nonce:number}|null; onRefresh:()=>Promise<void> }) {
  const [text, setText] = useState('');
@@ -42,7 +42,6 @@ export function ConversationInput({ onSaved, onPreview, savedNodes, showingPrevi
   <div className="input-label"><label htmlFor="conversation-text">Conversation</label><InfoTip>Analyze, review the suggestions, then save them to the graph.</InfoTip><div className="language-slot" ref={setLanguageSlot}/></div><textarea id="conversation-text" className="conversation-textarea" maxLength={8000} disabled={busy||listening} value={text} onChange={e=>{setText(e.target.value); setResult(null); setSaved(false);}} />
   <div className="conversation-input-actions"><VoiceInput languageSlot={languageSlot} disabled={busy} onListeningChange={setListening} onTranscript={part=>{setText(previous=>(previous ? `${previous.trimEnd()} ${part}` : part).slice(0,8000));setResult(null);setSaved(false);}}/>
   <div className="analyze-actions"><button className="analyze-button" type="button" disabled={busy || listening || !text.trim()} onClick={analyze}>{busy ? 'Working…' : <><Sparkles className="button-icon" aria-hidden="true"/>Analyze</>}</button></div></div>
-  <VoiceNote disabled={busy||listening} onReview={(transcript,analysis)=>{setText(transcript);setResult(analysis);setSaved(false);setError('');}}/>
   {error && <p role="alert">{error}</p>}{saved && <p role="status">Saved to the graph. Any message draft still requires approval.</p>}
   {result && showingPreview && <fieldset disabled={busy} className="review"><div className="review-heading"><h3>Review Before Saving</h3><p>Correct or remove anything inaccurate.</p></div>
    <div className="topic-card" id="context-preview-topic"><label className="topic-title">Topic<input value={result.topic} onChange={e=>setResult({...result,topic:e.target.value})}/></label>
@@ -68,5 +67,6 @@ export function ConversationInput({ onSaved, onPreview, savedNodes, showingPrevi
    <div className="review-actions"><button type="button" disabled={busy} onClick={save}>Save reviewed context</button> <button className="secondary-button" type="button" disabled={busy} onClick={()=>setResult(null)}>Discard</button></div>
   </fieldset>}
   {!showingPreview && <SavedContext nodes={savedNodes} onRefresh={onRefresh} navigation={navigation}/>}
+  {!showingPreview && !result && !text.trim() && savedNodes.length===0 && <div className="empty-illustration empty-understand"><EmptyCurve curve="lemniscate" color="hsl(var(--accent))"/></div>}
  </section>;
 }

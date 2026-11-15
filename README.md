@@ -23,7 +23,7 @@ Reported facts, expressed feelings and needs, and possible interpretations are k
 - Graph PDF export was manually checked for correctness; its visual presentation could still be improved.
 - Simulated messages and automated mock tests exercise the approval and reply pipelines without contacting a real person.
 
-The core MVP has been validated end to end. The new browser voice-note flow and phone layout still need a real-device test. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
+The core MVP has been validated end to end. The phone layout still needs visual testing and refinement. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
 
 ## Run locally
 
@@ -64,7 +64,7 @@ Select a saved conversation and use **Delete** to remove its local graph, drafts
 
 ## Voice
 
-**Asynchronous browser voice note:** Open Voice Note under Hear the Meaning, record up to one minute, and send it. ElevenLabs transcribes the audio, then the configured AI provider analyzes the transcript in the background. Return in the same browser to review the result or listen to a short summary using the device's speech voice. Save the reviewed context to add it to the Graph; sending any draft still requires separate approval. Delete Note removes the stored transcript and analysis; the audio is not stored. A server restart interrupts an unfinished note and it must be recorded again. Only one note is processed at a time. This flow uses ElevenLabs speech-to-text and is separate from Photon phone calls; it has not yet been tested on iPhone.
+**Legacy voice-note data:** The retired browser voice-note feature is no longer available. Its previously stored transcripts and analyses, if any, remain in the local SQLite database's `voice_notes` table; removing the feature does not erase existing data.
 
 **Suggested delegation:** Delegate reuses the suggested action saved in the conversation and preselects the person when there is only one. You can change the action or recipient and generate a message draft for separate approval. If analysis already suggested a message, its draft appears in Messages & Drafts. Generating a message sends the saved conversation to the configured AI provider.
 
@@ -93,3 +93,4 @@ Analysis, draft generation, reply analysis, and recovery send the relevant enter
 OpenTelemetry analysis tracing is optional. Set `LOGFIRE_TOKEN` in the ignored `.env` file and, if needed, `LOGFIRE_BASE_URL` for the correct region. Restart the backend after changes. With no token, no traces are exported. The application exports only its allowlisted manual analysis spans, with status, timing, and safe diagnostic categories; it does not intentionally include conversation text, contact details, credentials, or raw provider errors. Live Logfire export still needs verification.
 
 The Coral theme and third-party notices are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The empty-state curves adapt BoldKit's MathCurveLoader and use its MIT-licensed math curve engine; see [the BoldKit license](THIRD_PARTY_LICENSES/boldkit.txt).

@@ -2,7 +2,7 @@
 
 ## BoldKit Coral theme
 
-The Coral theme variables in `coral.css` come from [BoldKit](https://github.com/ANIBIT14/boldkit), which is distributed under the MIT License:
+The Coral theme variables in `coral.css`, curve engine in `src/vendor/boldkit/math-curves.ts`, and adapted MathCurveLoader and MathCurveBackground in `src/EmptyCurve.tsx` come from [BoldKit](https://github.com/ANIBIT14/boldkit), which is distributed under the MIT License:
 
 MIT License
 
@@ -25,6 +25,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Outfit Variable
+
+Outfit Variable is by the Outfit Project Authors and is distributed under the SIL Open Font License 1.1. See `THIRD_PARTY_LICENSES/outfit.txt`.
 
 ## Lucide Icons
 
