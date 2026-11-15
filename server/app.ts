@@ -1,6 +1,7 @@
 import { traceAnalysis } from './telemetry.ts';
 import { initialInsights, semanticFilterInsights } from './insight-filter.ts';
 import { cloudflareEmbedder } from './embeddings.ts';
+import { repeatsPreviousMessage } from './auto-reply-guard.ts';
 import Fastify from 'fastify';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Store } from './store.ts';
@@ -24,9 +25,13 @@ async function processAutoReply(messageId:string) {
   let reserved=false;
   try {
     const context=store.replyAnalysisContext(initial.replyId);
-    const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer({...context,stylePreferences:initial.preferences})));
-    const reply=analysis.suggestedReply?.trim();
-    if(!reply){store.finishAutoReply(initial.replyId,'needs_review');return;}
+    let analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer({...context,stylePreferences:initial.preferences})));
+    let reply=analysis.suggestedReply?.trim();
+    if(reply && repeatsPreviousMessage(reply,context.outgoingMessage)){
+      analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer({...context,stylePreferences:initial.preferences,avoidRepeatingPrevious:true})));
+      reply=analysis.suggestedReply?.trim();
+    }
+    if(!reply || repeatsPreviousMessage(reply,context.outgoingMessage)){store.finishAutoReply(initial.replyId,'needs_review');return;}
     const text=`[NeuroProxy AutoReply]\n${reply}`;
     if(text.length>2000){store.finishAutoReply(initial.replyId,'needs_review');return;}
     const current=store.autoReplyMatch(messageId);

@@ -79,3 +79,15 @@ test('an auto-reply that cannot fit its disclosure is held for review',async()=>
   await waitFor(()=>store.autoReplySettings(topicId).lastStatus==='needs_review');assert.equal(sends,0);
  }finally{await app.close();store.close();}
 });
+
+test('auto-reply retries a repeated previous message and sends only the revised response',async()=>{
+ let calls=0,sends=0;const request:typeof fetch=async(_url,init)=>{sends++;assert.equal(JSON.parse(String(init?.body)).content.text,'[NeuroProxy AutoReply]\nI can meet on Saturday.');return Response.json({id:autoSent,projectId:project,space:{id:space},status:'dispatched'},{status:202});};
+ const store=new Store(':memory:');const app=createApp(store,undefined,{secret,projectId:project},new PhotonSender({apiKey:'test',projectId:project},request),undefined,async input=>{calls++;assert.equal(input.outgoingMessage,'Hello');assert.equal(input.reply,'Can you meet Saturday?');assert.equal(input.avoidRepeatingPrevious,calls===2 ? true : undefined);return {relationship,suggestedReply:calls===1?'Hello!':'I can meet on Saturday.'};});
+ try{const {topicId,personId}=setup(store);await app.inject({method:'PUT',url:`/api/conversations/${topicId}/auto-reply`,payload:{enabled:true,personId,preferences:'',consent:true}});await app.inject(signedEvent('repeat','pho_msg_00000000000000000000000009','Can you meet Saturday?',firstSent));await waitFor(()=>store.autoReplySettings(topicId).lastStatus==='submitted');assert.equal(calls,2);assert.equal(sends,1);}finally{await app.close();store.close();}
+});
+
+test('auto-reply sends nothing when both generated responses repeat the previous message',async()=>{
+ let calls=0,sends=0;const request:typeof fetch=async()=>{sends++;throw Error('must not send');};
+ const store=new Store(':memory:');const app=createApp(store,undefined,{secret,projectId:project},new PhotonSender({apiKey:'test',projectId:project},request),undefined,async()=>{calls++;return {relationship,suggestedReply:'Hello!'};});
+ try{const {topicId,personId}=setup(store);await app.inject({method:'PUT',url:`/api/conversations/${topicId}/auto-reply`,payload:{enabled:true,personId,preferences:'',consent:true}});await app.inject(signedEvent('repeat-twice','pho_msg_0000000000000000000000000a','Can you meet Saturday?',firstSent));await waitFor(()=>store.autoReplySettings(topicId).lastStatus==='needs_review');assert.equal(calls,2);assert.equal(sends,0);}finally{await app.close();store.close();}
+});

@@ -36,7 +36,8 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [ ] Select and verify a contact, edit the draft, and explicitly approve a real message; verify no external message is sent without approval.
 - [x] Complete the end-to-end delegation workflow, including receiving and analyzing a reply and creating a follow-up draft in the same Graph (developer verified).
 - [ ] Verify persistence after restart, duplicate webhook handling, and clear labels for simulated versus real messages.
-- [ ] Manually test conversation-scoped AutoReply using only the developer's consenting iPhone; verify the off switch and an opt-out, then disable it after the test. The initial implementation has only been tested with mock Photon requests.
+- [x] Manually test a conversation-scoped AutoReply through real iMessage to the developer's own iPhone; the developer confirmed that the response addressed the incoming message.
+- [ ] Separately verify the AutoReply off switch, opt-out behavior, and message disclosure in a real iMessage test; disable AutoReply after testing. These cases have mock coverage but were not confirmed in the successful live test.
 - [ ] Record a backup demo and clearly identify live, simulated, and unverified behavior.
 
 ## Deferred — Real SMS Setup and Verification
