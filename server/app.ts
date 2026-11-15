@@ -25,6 +25,7 @@ async function processAutoReply(messageId:string) {
   let draftId:string|undefined;
   let reserved=false;
   try {
+    photon.assertConfigured();
     const context=store.replyAnalysisContext(initial.replyId);
     let analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer({...context,stylePreferences:initial.preferences})));
     let reply=analysis.suggestedReply?.trim();
@@ -181,6 +182,7 @@ app.post('/api/drafts/:id/approve-photon-imessage', async (req,reply) => {
  if(!target || target.humanHandle!==b.approvedHandle) return reply.code(400).send({error:'The selected iMessage conversation no longer matches the approved recipient.'});
  const id=(req.params as {id:string}).id;
  store.assertDraftConversationOpen(id);
+ photon.assertConfigured();
  const reserved=store.reservePhoton(id,target.spaceId,target.senderId,target.recipientId,b.approvedBody,target.humanHandle,b.label as string|undefined,b.introduce as boolean|undefined);
  const messageId=await photon.send({...target,recipientPhone:target.humanHandle},reserved.body,reserved.key,target.parentMessageId);
  store.finishPhoton(id,messageId);

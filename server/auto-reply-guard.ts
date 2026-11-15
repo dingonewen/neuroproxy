@@ -1,3 +1,10 @@
+/** Recognize opt-out commands without treating ordinary uses of "stop" as a request to end contact. */
+export function isAutoReplyOptOut(text:string):boolean {
+ const value=text.normalize('NFKC').trim();
+ return /^(?:please\s+)?(?:stop|unsubscribe(?:\s+me)?|opt\s*out)(?:\s+please)?[.!?\s]*$/i.test(value)
+  || /\b(?:stop\s+(?:contacting|messaging|texting)|do not\s+(?:contact|message|text)|don['’]t\s+(?:contact|message|text))\s+me\b|\bleave me alone\b|不要再联系|别再联系|停止联系/i.test(value);
+}
+
 /** Compare with the previous outbound message; do not treat an AutoReply label as message content. */
 export function repeatsPreviousMessage(candidate:string,previous:string):boolean {
  const normalize=(text:string)=>text.replace(/^\s*\[NeuroProxy AutoReply\]\s*/i,'').normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');

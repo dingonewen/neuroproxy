@@ -10,6 +10,19 @@ import { parsePhotonMessage } from './photon-webhook.ts';
 
 const project='pho_prj_00000000000000000000000001',space='pho_spc_00000000000000000000000001',agent='pho_usr_00000000000000000000000001',human='pho_usr_00000000000000000000000002',incoming='pho_msg_00000000000000000000000001',outgoing='pho_msg_00000000000000000000000002';
 const secret='whsec_'+Buffer.alloc(32,7).toString('base64');
+test('missing Photon credentials do not reserve or lock an approved iMessage draft',async()=>{
+ let requests=0;
+ const store=new Store(':memory:');
+ const app=createApp(store,undefined,undefined,new PhotonSender({projectId:project},async()=>{requests++;throw Error('must not request');}));
+ try {
+  store.receivePhoton({eventId:'initial',messageId:incoming,spaceId:space,senderId:human,recipientId:agent,parentMessageId:null,body:'Start',imessage:{humanHandle:'+14155550123',agentHandle:'+14155550124'}});
+  const draft=store.create('Project','Alex','Ask','Hello');bindTestContact(store,draft);
+  const response=await app.inject({method:'POST',url:`/api/drafts/${draft}/approve-photon-imessage`,payload:{nodeId:store.imessageSessions()[0].nodeId,approvedHandle:'+14155550123',approvedBody:'Hello',consent:true,label:'',introduce:false}});
+  assert.equal(response.statusCode,400);assert.match(response.json().error,/credentials/);assert.equal(requests,0);
+  assert.equal(store.graph().drafts.find(d=>d.id===draft)?.state,'pending_approval');
+  assert.equal(store.db.prepare('SELECT COUNT(*) AS count FROM photon_dispatches').get()?.count,0);
+ } finally {await app.close();store.close();}
+});
 test('iMessage introduction matches the approved message and cannot be changed silently',()=>{
  const store=new Store(':memory:');
  try {

@@ -2,6 +2,15 @@
 
 NeuroProxy uses TypeScript end to end.
 
+## Code review fixes
+
+- AutoReply distinguishes standalone opt-out commands and explicit stop-contact requests from ordinary phrases such as "I can stop by Friday." Mock tests cover both opt-out and continued messaging.
+- iMessage sending validates local Photon configuration before reserving a draft, so missing credentials leave it editable and awaiting approval rather than stuck submitting.
+- Delegation inputs are locked while generating or saving a draft, keeping the generated message associated with the chosen recipient and action.
+- Changing the displayed message body or contact clears the send-consent checkbox, including when another browser edits the draft.
+
+## Implementation approach
+
 1. Use a single Mastra agent with explicit tools and no workspace or subagent permissions. Persist structured graph state separately; keep approval and delivery in deterministic code.
 2. Use a React Flow canvas with Dagre layout and typed nodes and edges.
 3. Implement persistent graph, draft, explicit approval, cancellation, idempotent send, shared reply processing and context recovery. Start with a clearly marked simulator.

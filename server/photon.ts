@@ -27,6 +27,7 @@ export class PhotonSender {
  constructor(privateConfig: PhotonConfig, request: typeof fetch = fetch) { this.config=privateConfig; this.request=request; }
  private config: PhotonConfig;
  private request: typeof fetch;
+ assertConfigured() { this.base(); }
  private base() {
   const project=this.config.projectId?.trim(); const key=this.config.apiKey?.trim();
   if (!key || !project || !/^pho_prj_[0-7][0-9a-hjkmnp-tv-z]{25}$/.test(project) || /[\r\n]/.test(key)) throw Error('Photon credentials or project ID are not configured.');

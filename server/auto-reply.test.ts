@@ -32,9 +32,9 @@ test('authorized AutoReply sends once for a uniquely matched reply and stops on 
   const {topicId,personId}=setup(store);const url=`/api/conversations/${topicId}/auto-reply`;
   assert.equal((await app.inject({method:'PUT',url,payload:{enabled:true,personId,preferences:'Be brief',consent:false}})).statusCode,400);
   assert.equal((await app.inject({method:'PUT',url,payload:{enabled:true,personId,preferences:'Be brief',consent:true}})).statusCode,200);
-  const event=signedEvent('reply1','pho_msg_00000000000000000000000004','Doing okay');
+  const event=signedEvent('reply1','pho_msg_00000000000000000000000004','I can stop by Friday.');
   assert.equal((await app.inject(event)).statusCode,204);await waitFor(()=>store.autoReplySettings(topicId).lastStatus==='submitted');
-  assert.equal(sends,1);assert.equal(modelCalls,1);assert.equal(preferences,'Be brief');
+  assert.equal(sends,1);assert.equal(modelCalls,1);assert.equal(preferences,'Be brief');assert.equal(store.autoReplySettings(topicId).enabled,true);
   const graph=store.graph();const auto=graph.drafts.find(d=>d.auto_generated===1);assert.equal(auto?.body,'[NeuroProxy AutoReply]\nThanks for telling me.');assert.equal(auto?.auto_reply_status,'submitted');assert.ok(auto?.photon_prepared_at);assert.equal(typeof auto?.auto_reply_received_at_ms,'number');
   assert.equal((await app.inject(event)).statusCode,204);assert.equal(sends,1);
   assert.equal((await app.inject(signedEvent('stop','pho_msg_00000000000000000000000005','Stop contacting me',autoSent))).statusCode,204);

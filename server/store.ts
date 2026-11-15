@@ -5,9 +5,9 @@ import type { PhotonMessage } from './photon-webhook.ts';
 import { groupGraph } from '../shared/graph-groups.ts';
 import { formatImessage, labelRealSms } from '../shared/sms.ts';
 import { replyProgressSchema, type ReplyProgress } from '../shared/reply-progress.ts';
+import { isAutoReplyOptOut } from './auto-reply-guard.ts';
 
 const eventHash=(value:string)=>createHash('sha256').update(value).digest('hex');
-const stopAutoReply=(text:string)=>/\b(stop|unsubscribe|opt\s*out|do not (?:contact|message|text)|don['’]t (?:contact|message|text)|leave me alone)\b|不要再联系|别再联系|停止联系/i.test(text);
 
 export class Store {
   db: DatabaseSync;
@@ -237,7 +237,7 @@ export class Store {
       if(deleted) {this.db.exec('COMMIT');return false;}
       const existing = this.db.prepare('SELECT 1 FROM photon_inbox WHERE event_id=? OR message_id=?').get(message.eventId, message.messageId);
       if (existing) { this.db.exec('COMMIT'); return false; }
-      if(message.imessage && stopAutoReply(message.body))this.db.prepare('UPDATE auto_reply_settings SET enabled=0,authorization_id=? WHERE enabled=1 AND space_id=? AND sender_id=? AND recipient_id=? AND lower(handle)=lower(?)').run(randomUUID(),message.spaceId,message.recipientId,message.senderId,message.imessage.humanHandle);
+      if(message.imessage && isAutoReplyOptOut(message.body))this.db.prepare('UPDATE auto_reply_settings SET enabled=0,authorization_id=? WHERE enabled=1 AND space_id=? AND sender_id=? AND recipient_id=? AND lower(handle)=lower(?)').run(randomUUID(),message.spaceId,message.recipientId,message.senderId,message.imessage.humanHandle);
       type Match = {id:string;task_id:string;person_id:string;message_id:string};
       let match = message.parentMessageId ? this.db.prepare(`SELECT d.task_id, d.person_id, d.message_id, d.id FROM photon_dispatches p JOIN drafts d ON d.id=p.draft_id WHERE p.photon_message_id=? AND p.space_id=? AND p.sender_id=? AND p.recipient_id=? AND d.state='waiting_for_reply'`).get(message.parentMessageId, message.spaceId, message.recipientId, message.senderId) as Match|undefined : undefined;
       let inferred=false;
@@ -245,7 +245,7 @@ export class Store {
         const candidates=this.db.prepare(`SELECT d.task_id,d.person_id,d.message_id,d.id, prep.approved_at FROM photon_dispatches p JOIN drafts d ON d.id=p.draft_id JOIN photon_preparations prep ON prep.draft_id=d.id WHERE p.space_id=? AND p.sender_id=? AND p.recipient_id=? AND d.state='waiting_for_reply'`).all(message.spaceId,message.recipientId,message.senderId) as (Match & {approved_at:string})[];
         if(candidates.length===1 && Date.parse(message.createdAt)>=Date.parse(candidates[0].approved_at)) {
           match=candidates[0]; inferred=true;
-          if(message.imessage && !stopAutoReply(message.body)) {
+          if(message.imessage && !isAutoReplyOptOut(message.body)) {
             const group=this.conversationForNode(match.message_id);
             const allowed=group && this.db.prepare('SELECT 1 FROM auto_reply_settings s JOIN person_contacts pc ON pc.person_id=s.person_id JOIN contacts c ON c.id=pc.contact_id WHERE s.topic_id=? AND s.person_id=? AND s.enabled=1 AND s.space_id=? AND s.sender_id=? AND s.recipient_id=? AND lower(s.handle)=lower(?) AND lower(c.handle)=lower(s.handle)').get(group.id,match.person_id,message.spaceId,message.recipientId,message.senderId,message.imessage.humanHandle);
             if(allowed && !this.db.prepare('SELECT 1 FROM ended_conversations WHERE topic_id=?').get(group!.id))inferred=false;
