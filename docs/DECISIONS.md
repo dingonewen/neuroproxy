@@ -91,3 +91,11 @@ For the motivation behind NeuroProxy, see [Vision](VISION.md). For the current i
 **Why:** I want to understand and demonstrate what the system actually does. AutoReply currently uses a structured model response followed by application-controlled checks and sending; it is not an autonomous tool-calling loop. Context recovery has a separate read-only Graph tool.
 
 **Revisit when:** A well-defined capability requires dynamic tool selection or coordination, and I can test permissions, failure handling, privacy, and user control. Framework complexity should serve the user's experience and reliability.
+
+## OMP-Inspired Recall and Long-Term Memory
+
+**Decision:** Keep the existing Node.js Graph and add a bounded, read-only `recall_memory` tool with source links for 04. Defer a separate long-term memory store and the OMP Mnemopi package.
+
+**Why:** The immediate need is to find relevant saved conversations and inspect the evidence behind a response. OMP's separation of recall, retention, reflection, and editing is a useful architecture reference; its Mnemopi implementation depends on Bun and OMP packages, while this application currently uses Node.js. No OMP code has been copied into this implementation.
+
+**Revisit when:** An isolated evaluation demonstrates that Mnemopi improves retrieval enough to justify its runtime and dependency cost, and validates source attribution, conversation isolation, privacy, deletion, and retention. User-reviewed memory candidates and consolidation remain future work.

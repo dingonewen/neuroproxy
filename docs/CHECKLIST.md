@@ -87,9 +87,12 @@ The developer deferred campaign registration after the Photon dashboard showed a
 
 - [ ] Build a small synthetic evaluation set for paraphrases, different people, dates, negations, and changed boundaries; compare results with the existing lexical cosine filter.
 - [x] Add optional Cloudflare embeddings for conversation-scoped, same-category reply-insight matching, with a conservative threshold and lexical fallback. Chinese text remains lexical; the live provider has not yet been verified.
-- [x] Add local BM25 ranking for conversation groups in context recovery without discarding groups.
+- [x] Add local BM25-based bounded Graph retrieval for context recovery, with links to model-cited retrieved nodes.
+- [ ] Manually verify Recall source links on desktop and mobile, including old or deleted conversations and questions with no exact keyword match.
 - [ ] Evaluate BM25 on names, phrases, and details; explore hybrid ranking only if semantic retrieval improves the evaluation.
 - [ ] Verify Recall can summarize AutoReply events with correct status and timestamps using a real or simulated conversation.
+- [ ] Evaluate OMP Mnemopi in an isolated Bun/TypeScript experiment: compatibility, provenance, deletion, privacy, and retrieval quality versus the current Node.js Graph before adding a dependency.
+- [ ] Explore user-reviewed long-term memory candidates, consolidation, and editable preferences; never automatically save interpretations of other people as facts.
 - [ ] Evaluate lightweight vector storage compatible with the existing TypeScript and SQLite architecture; add a vector database only if it improves the prototype enough to justify setup and operational complexity.
 - [ ] Keep sensitive data scoped to the right conversation, disclose any additional provider processing, and remove associated vectors and indexes when conversations are deleted.
 - [ ] Demonstrate a measured improvement on the evaluation set and accurately describe what is implemented, rather than claiming semantic retrieval solely because a dependency is present.

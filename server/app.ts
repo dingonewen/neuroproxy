@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Store } from './store.ts';
 import { createAgent } from './agent.ts';
+import { validateRecoveryCitations, type RecoverySource } from './recovery-memory.ts';
 import { extractConversation, type Extractor } from './extract.ts';
 import { validateExtraction } from '../shared/extraction.ts';
 import { parsePhotonMessage, verifyPhotonWebhook } from './photon-webhook.ts';
@@ -15,7 +16,7 @@ import { generateManualMessage, type ManualMessageGenerator } from './manual-mes
 import { analyzeReply, replyAnalysisSchema, type ReplyAnalyzer } from './reply-analysis.ts';
 import { elevenLabsAgentStatus } from './elevenlabs.ts';
 import type { ReplyProgress } from '../shared/reply-progress.ts';
-export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply) {
+export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply, recoveryOverride?:(question:string,recalled:Map<string,RecoverySource>)=>Promise<{text:string}>) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
 async function processAutoReply(messageId:string) {
@@ -139,9 +140,15 @@ app.post('/api/replies/:id/draft', async req => {const id=(req.params as {id:str
 app.post('/api/ask', async (req) => {
   const question = (req.body as {question?:unknown})?.question;
   if (typeof question !== 'string' || !question.trim() || question.length > 2000) throw new Error('Enter a question (maximum 2000 characters).');
-  if (!process.env.NEUROPROXY_MODEL) throw new Error('Set NEUROPROXY_MODEL and the provider credentials to use context recovery.');
-  const result = await createAgent(store,question).generate(question, { maxSteps: 5 });
-  return { answer: result.text };
+  if (!process.env.NEUROPROXY_MODEL && !recoveryOverride) throw new Error('Set NEUROPROXY_MODEL and the provider credentials to use context recovery.');
+  const recalled=new Map<string,RecoverySource>();
+  const result = recoveryOverride ? await recoveryOverride(question,recalled) : await createAgent(store,question,recalled).generate(question, { maxSteps: 5 });
+  const current=store.graph();
+  if(!recalled.size) return {answer:current.nodes.length ? 'I could not retrieve the saved context. Please try again.' : 'There is no saved context to recall yet.',sources:[]};
+  const currentById=new Map(current.nodes.map(node=>[String(node.id),node]));
+  if([...recalled.values()].some(source=>{const node=currentById.get(source.id);return !node || String(node.label).slice(0,1000)!==source.text || String(node.status)!==source.status;}))return {answer:'The saved context changed while I was answering. Please ask again.',sources:[]};
+  const grounded=validateRecoveryCitations(result.text,recalled);
+  return grounded.sources.length ? grounded : {answer:'I could not link an answer to a saved source. Please try a more specific question.',sources:[]};
 });
 app.post('/api/drafts', async (req) => { const b = req.body as Record<string,string>; return { id: store.create(b.topic, b.person, b.task, b.body) }; });
 app.post('/api/conversations/:id/delegation-suggestion', async (req,reply) => {

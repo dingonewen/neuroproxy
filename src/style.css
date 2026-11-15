@@ -543,3 +543,10 @@ main :is(input:not([type="checkbox"]):not([type="radio"]), textarea){font-weight
 .auto-reply-header button.voice-switch[aria-checked="false"]{background:hsl(var(--accent))!important}
 .auto-reply-header button.voice-switch[aria-checked="true"]{background:hsl(var(--primary))!important}
 .auto-reply-header .auto-reply-switch-row{gap:4px}
+
+/* Source links remain compact within the Recall card. */
+.recovery-sources{border-top:1px solid hsl(var(--border)/.25);margin-top:10px;padding-top:8px;display:grid;gap:5px}
+.recovery-sources>strong{font-size:.75rem}
+.recovery-panel .recovery-source-button{display:grid;text-align:left;gap:2px;min-width:0;padding:5px 7px;font-size:.7rem;letter-spacing:0;text-transform:none;overflow:hidden}
+.recovery-source-button span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recovery-source-button span+span{font-weight:400}
