@@ -23,6 +23,7 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS voice_captures (capture_hash TEXT PRIMARY KEY, topic_id TEXT REFERENCES nodes(id) ON DELETE SET NULL, summary TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS reply_insights_reviewed (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS reply_progress (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, stage TEXT NOT NULL, data TEXT NOT NULL);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS ended_conversations (topic_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE);`);
   }
   contacts() {return this.db.prepare('SELECT id,name,handle FROM contacts ORDER BY name COLLATE NOCASE,id').all();}
   createContact(name:unknown,handle:unknown) {
@@ -109,7 +110,32 @@ export class Store {
   }
   node(kind: string, label: string, status = '', source = 'user') { const id = randomUUID(); this.db.prepare('INSERT INTO nodes VALUES (?,?,?,?,?)').run(id, kind, label, status, source); return id; }
   edge(source: string, target: string, label: string) { this.db.prepare('INSERT INTO edges VALUES (?,?,?,?)').run(randomUUID(), source, target, label); }
-  graph() { return { nodes: this.db.prepare('SELECT nodes.*, EXISTS(SELECT 1 FROM reply_insights_reviewed rir WHERE rir.reply_id=nodes.id) AS analysis_reviewed, c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM nodes LEFT JOIN person_contacts pc ON pc.person_id=nodes.id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY nodes.rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label,c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id LEFT JOIN person_contacts pc ON pc.person_id=drafts.person_id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY drafts.rowid DESC').all() }; }
+  graph() { return { nodes: this.db.prepare('SELECT nodes.*, EXISTS(SELECT 1 FROM reply_insights_reviewed rir WHERE rir.reply_id=nodes.id) AS analysis_reviewed, EXISTS(SELECT 1 FROM ended_conversations ec WHERE ec.topic_id=nodes.id) AS conversation_ended, c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM nodes LEFT JOIN person_contacts pc ON pc.person_id=nodes.id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY nodes.rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label,c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id LEFT JOIN person_contacts pc ON pc.person_id=drafts.person_id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY drafts.rowid DESC').all() }; }
+  conversationForNode(nodeId:string) {
+    const graph=this.graph();
+    return groupGraph(graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)})),graph.edges.map(e=>({source:String(e.source),target:String(e.target)}))).find(g=>g.id!=='unlinked' && g.nodeIds.has(nodeId));
+  }
+  assertConversationOpen(nodeId:string) {
+    const group=this.conversationForNode(nodeId);
+    if(!group)throw Error('Conversation not found.');
+    if(this.db.prepare('SELECT 1 FROM ended_conversations WHERE topic_id=?').get(group.id))throw Error('This conversation has ended.');
+  }
+  assertDraftConversationOpen(draftId:string) {
+    const draft=this.db.prepare('SELECT message_id FROM drafts WHERE id=?').get(draftId) as {message_id:string}|undefined;
+    if(!draft)throw Error('Draft not found.');
+    this.assertConversationOpen(draft.message_id);
+  }
+  endConversation(topicId:string) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const group=this.conversationForNode(topicId);
+      if(!group || group.id!==topicId)throw Error('Conversation not found.');
+      const drafts=this.graph().drafts.filter(d=>group.nodeIds.has(String(d.message_id)));
+      if(drafts.some(d=>d.state==='preparing'||d.state==='submitting'))throw Error('A message is being sent. Try again after it finishes.');
+      this.db.prepare('INSERT OR IGNORE INTO ended_conversations VALUES (?)').run(topicId);
+      this.db.exec('COMMIT');
+    } catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
   reviseNode(id:string, expectedLabel:unknown, label:unknown) {
     if(typeof expectedLabel!=='string' || typeof label!=='string' || !label.trim()) throw Error('Enter the revised content.');
     this.db.exec('BEGIN IMMEDIATE');

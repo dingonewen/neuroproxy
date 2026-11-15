@@ -155,6 +155,24 @@ test('confirmed replies can produce one follow-up draft on the same person and c
  }finally{await app.close();store.close();}
 });
 
+test('ending a conversation preserves history and blocks follow-ups and pending sends', async () => {
+ const store=new Store(':memory:');const app=createApp(store);
+ try {
+  const id=store.create('Connection','Alex','Ask','Hello');
+  store.transition(id,'waiting_for_reply');store.reply(id,'Hi','simulated');
+  const graph=store.graph();const reply=graph.nodes.find(n=>n.kind==='reply')!;const topic=graph.nodes.find(n=>n.kind==='topic')!;
+  const followup=await app.inject({method:'POST',url:`/api/replies/${reply.id}/draft`,payload:{action:'Reply',body:'Thanks'}});
+  assert.equal(followup.statusCode,200);
+  assert.equal((await app.inject({method:'POST',url:`/api/conversations/${topic.id}/end`})).statusCode,200);
+  const after=store.graph();assert.equal(after.nodes.length,graph.nodes.length+2);assert.equal(after.nodes.find(n=>n.id===topic.id)?.conversation_ended,1);
+  assert.equal((await app.inject({method:'POST',url:`/api/replies/${reply.id}/analyze`})).statusCode,400);
+  assert.equal((await app.inject({method:'POST',url:`/api/replies/${reply.id}/draft`,payload:{action:'Reply',body:'Thanks'}})).statusCode,400);
+  assert.equal((await app.inject({method:'POST',url:`/api/drafts/${followup.json().id}/approve-simulation`})).statusCode,400);
+  assert.equal(store.graph().drafts.find(d=>d.id===followup.json().id)?.state,'pending_approval');
+  assert.equal((await app.inject({method:'DELETE',url:`/api/conversations/${topic.id}`})).statusCode,200);
+ }finally{await app.close();store.close();}
+});
+
 test('manual delegation stays in the chosen conversation and reuses the selected person', async () => {
  const store=new Store(':memory:');let modelInput='';
  const app=createApp(store,undefined,undefined,undefined,async input=>{modelInput=JSON.stringify(input);return {body:'Can we talk honestly?',reason:null};});

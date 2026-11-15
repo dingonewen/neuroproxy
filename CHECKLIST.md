@@ -32,10 +32,18 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [x] Verify that a real phone call can create a Graph on the web.
 - [ ] Check the generated people, questions, suggested action, and any draft against the spoken input.
 - [ ] Verify a short, low-pressure voice response that does not require the user to keep answering.
-- [ ] Confirm a contact, edit the draft, and explicitly approve a real message; verify no external message is sent without approval.
+- [ ] Select and verify a contact, edit the draft, and explicitly approve a real message; verify no external message is sent without approval.
 - [x] Complete the end-to-end delegation workflow, including receiving and analyzing a reply and creating a follow-up draft in the same Graph (developer verified).
 - [ ] Verify persistence after restart, duplicate webhook handling, and clear labels for simulated versus real messages.
 - [ ] Record a backup demo and clearly identify live, simulated, and unverified behavior.
+
+## P0 — Real SMS Setup and Verification
+
+- [ ] Ask Photon which SMS campaign purpose matches user-approved personal messages and whether a test-only path is available for the developer's own phone.
+- [ ] Confirm how recipient consent and STOP opt-outs are handled, including whether Photon blocks subsequent sends; implement any required handling before claiming it works.
+- [ ] Register the appropriate campaign truthfully, link the SMS number, and verify approval and recipient eligibility with Photon.
+- [ ] Display actionable Photon SMS rejection details without mislabeling a definitive rejection as an unknown send outcome.
+- [ ] Test a real SMS to the developer's own phone and verify receipt and a reply through the webhook; test STOP handling when supported.
 
 ## P0 — Desktop UI Redesign (BoldKit Coral)
 
@@ -79,7 +87,7 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 
 - [ ] **Target users:** Explain the accessibility needs of neurodivergent people, including possible challenges with working memory, attention, reading, task initiation, and interpersonal communication; avoid treating all users as the same.
 - [ ] **Health and wellness use case:** Demonstrate how voice, persistent context, and supported communication can reduce the effort of managing an interpersonal situation.
-- [ ] **User control:** Show editable interpretations, optional actions, contact confirmation, and explicit approval before real messages are sent.
+- [ ] **User control:** Show editable interpretations, optional actions, contact selection and verification, and explicit approval before real messages are sent.
 - [ ] **Responsible positioning:** Present NeuroProxy as a communication and accessibility aid; do not claim it diagnoses or treats a medical condition.
 - [ ] **Privacy:** Explain what is stored, which providers receive conversation data, and how a user can delete a saved conversation.
 - [ ] Confirm the Healthcare track selection and any track-specific submission requirements.
@@ -90,7 +98,7 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 - [ ] **0:00–0:15:** Introduce the target user and concrete accessibility problem.
 - [ ] **0:15–0:35:** Briefly show the prepared call recording or describe the already-verified Photon call; identify it as pre-recorded if shown.
 - [ ] **0:35–1:00:** Show the generated Graph, direct next action, and reviewable message draft.
-- [ ] **1:00–1:35:** Confirm the test contact, review the exact message, and explicitly approve a real iMessage to the developer's own iPhone.
+- [ ] **1:00–1:35:** Select and verify the test contact, review the exact message, and explicitly approve a real iMessage to the developer's own iPhone.
 - [ ] **1:35–1:55:** Show the test reply in the Graph and a follow-up suggestion, or use a clearly labeled prepared result if live timing is too slow.
 - [ ] **1:55–2:00:** State the user benefit and the current limitations. Practice with a timer and avoid claiming delivery or features not demonstrated.
 
@@ -102,6 +110,7 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 
 ## P2 — After the MVP / Only If Time Remains
 
+- [ ] Strengthen contact identity handling for duplicate names, with clear disambiguation and reliable confirmation across conversations and devices.
 - [ ] Strengthen privacy: minimize provider context, clearly disclose data sharing and deletion scope, verify Logfire excludes sensitive content, and review provider retention and local data protection. Evaluate sandboxing only where executable tools or file access require isolation.
 - [ ] Profile Graph layout and rendering on representative data before considering WebAssembly; adopt it only if a measured bottleneck and a compatible implementation justify the added integration work.
 - [ ] Add caller verification before considering phone access to saved context or voice-based approvals.
