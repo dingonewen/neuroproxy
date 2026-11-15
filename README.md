@@ -4,6 +4,8 @@
 
 <p align="center"><strong>For minds that wander, and hearts that care.</strong></p>
 
+<p align="center"><a href="https://youtu.be/zoB4PE-GHkA">Watch the demo on YouTube</a></p>
+
 NeuroProxy is a voice-first companion that helps neurodivergent people remember, connect, and communicate. It turns a conversation into a reviewable Cognitive Action Graph, helps its user take a next step through iMessage, and remembers the context when a reply comes back.
 
 I built NeuroProxy from my own experience with ADHD: I can care deeply about someone and still lose track of what they said, miss a message, or struggle to find the words to reply. I want the people around me to know that even when my mind wanders, my heart cares. [Read the project vision](docs/VISION.md).
