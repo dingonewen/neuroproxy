@@ -535,3 +535,11 @@ main :is(input:not([type="checkbox"]):not([type="radio"]), textarea){font-weight
 .conversation-panel .voice-input button.voice-switch[aria-checked="false"]{background:var(--neuroproxy-blue)!important}
 .recovery-panel .voice-input button.voice-switch[aria-checked="false"]{background:hsl(var(--secondary))!important}
 .conversation-panel .voice-input button.voice-switch[aria-checked="true"],.recovery-panel .voice-input button.voice-switch[aria-checked="true"]{background:hsl(var(--primary))!important}
+
+.auto-reply-section .input-label label{margin:0}
+
+.auto-reply-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;margin:24px 0 10px}
+.delegation-panel .auto-reply-header .delegations-heading{margin:0}
+.auto-reply-header button.voice-switch[aria-checked="false"]{background:hsl(var(--accent))!important}
+.auto-reply-header button.voice-switch[aria-checked="true"]{background:hsl(var(--primary))!important}
+.auto-reply-header .auto-reply-switch-row{gap:4px}
