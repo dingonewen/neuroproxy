@@ -2,7 +2,7 @@
 
 This is my record of the features and approaches I have tried, deferred, changed, or chosen not to build yet. It captures the reasoning and constraints I had at the time, not permanent rules. I can revisit a decision when the product, evidence, or available resources change.
 
-For the motivation behind NeuroProxy, see [Vision](VISION.md). For the current implementation and outstanding work, see [Implementation](../IMPLEMENTATION.md) and [Checklist](../CHECKLIST.md).
+For the motivation behind NeuroProxy, see [Vision](VISION.md). For the current implementation and outstanding work, see [Implementation](IMPLEMENTATION.md) and [Checklist](CHECKLIST.md).
 
 ## Browser Voice Notes
 

@@ -1,6 +1,6 @@
 # NeuroProxy
 
-<img src="assets/logo.png" alt="NeuroProxy brain logo and tagline" width="200">
+![NeuroProxy logo and tagline](assets/logo.png)
 
 **For minds that wander, and hearts that care.**
 
@@ -10,7 +10,9 @@ I built NeuroProxy from my own experience with ADHD: I can care deeply about som
 
 NeuroProxy is an accessibility and communication aid, not a medical device. It does not diagnose or treat a condition.
 
-<img src="assets/NeuroProxy-start.jpg" alt="NeuroProxy's desktop workspace, with conversation understanding, Graph, messaging, and context recovery panels" width="720">
+![NeuroProxy desktop workspace with conversation understanding, Graph, messaging, and context recovery panels](assets/NeuroProxy-start.jpg)
+
+*The four-part workspace brings understanding, visualization, action, and recall together.*
 
 ## From a conversation to a connection
 
@@ -23,7 +25,7 @@ Imagine telling NeuroProxy that you want to reconnect with a friend but are unsu
 
 The desktop and mobile web interfaces share this workflow. On mobile, colored tabs and horizontal swipes switch sections while the Graph retains its own gestures. Neither a native iOS app nor a second phone is required for the developer's test setup.
 
-<img src="assets/NeuroProxy-process.jpg" alt="A saved conversation in NeuroProxy, showing relationship context, a message exchange, a pending draft, and its Cognitive Action Graph" width="720">
+![A saved conversation showing relationship context, a message exchange, a pending draft, and its Cognitive Action Graph](assets/NeuroProxy-process.jpg)
 
 *A conversation in progress: reviewed context, messages, and the Graph stay together.*
 
@@ -42,6 +44,8 @@ NeuroProxy combines AI interpretation with application-controlled tools and stat
 This is a practical accessibility workflow built around a real personal need, not a claim of measured clinical effectiveness or a completed user study. More about the design and longer-term direction is in [Vision](docs/VISION.md) and [Decisions](docs/DECISIONS.md).
 
 ## Architecture
+
+The diagram follows a conversation from voice or text through AI analysis and the Graph, then into approved Photon messaging and read-only memory retrieval.
 
 ```mermaid
 flowchart TD
