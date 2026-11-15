@@ -1,8 +1,8 @@
-# NeuroProxy
+<p align="center"><img src="assets/logo.png" alt="NeuroProxy logo" width="150"></p>
 
-![NeuroProxy logo and tagline](assets/logo.png)
+<h1 align="center">NeuroProxy</h1>
 
-**For minds that wander, and hearts that care.**
+<p align="center"><strong>For minds that wander, and hearts that care.</strong></p>
 
 NeuroProxy is a voice-first companion that helps neurodivergent people remember, connect, and communicate. It turns a conversation into a reviewable Cognitive Action Graph, helps its user take a next step through iMessage, and remembers the context when a reply comes back.
 
@@ -10,7 +10,7 @@ I built NeuroProxy from my own experience with ADHD: I can care deeply about som
 
 NeuroProxy is an accessibility and communication aid, not a medical device. It does not diagnose or treat a condition.
 
-![NeuroProxy desktop workspace with conversation understanding, Graph, messaging, and context recovery panels](assets/NeuroProxy-start.jpg)
+<p align="center"><img src="assets/NeuroProxy-start.jpg" alt="NeuroProxy desktop workspace with conversation understanding, Graph, messaging, and context recovery panels" width="500"></p>
 
 *The four-part workspace brings understanding, visualization, action, and recall together.*
 
@@ -25,7 +25,7 @@ Imagine telling NeuroProxy that you want to reconnect with a friend but are unsu
 
 The desktop and mobile web interfaces share this workflow. On mobile, colored tabs and horizontal swipes switch sections while the Graph retains its own gestures. Neither a native iOS app nor a second phone is required for the developer's test setup.
 
-![A saved conversation showing relationship context, a message exchange, a pending draft, and its Cognitive Action Graph](assets/NeuroProxy-process.jpg)
+<p align="center"><img src="assets/NeuroProxy-process.jpg" alt="A saved conversation showing relationship context, a message exchange, a pending draft, and its Cognitive Action Graph" width="500"></p>
 
 *A conversation in progress: reviewed context, messages, and the Graph stay together.*
 
@@ -47,27 +47,7 @@ This is a practical accessibility workflow built around a real personal need, no
 
 The diagram follows a conversation from voice or text through AI analysis and the Graph, then into approved Photon messaging and read-only memory retrieval.
 
-```mermaid
-flowchart TD
-    user["User: desktop or mobile web"] -->|"text or browser speech"| extract["Conversation analysis and structured extraction"]
-    phone["User: phone call"] -->|"Photon SMS voice number / SIP"| voice["ElevenLabs voice agent"]
-    voice -->|"caller-approved capture"| extract
-    extract --> review["User reviews context and suggestions"]
-    review --> graph[("SQLite: Cognitive Action Graph, messages and reply progress")]
-    graph --> visual["React Flow: explore and export Graph"]
-    graph --> draft["Choose recipient and draft message"]
-    draft -->|"explicit approval"| photon["Photon 2.0 iMessage"]
-    photon --> recipient["Recipient"]
-    recipient -->|"reply"| webhook["Signed Photon webhook"]
-    webhook --> graph
-    graph --> followup["Analyze reply and review follow-up"]
-    graph -->|"separately enabled for eligible contact"| auto["Experimental, labeled AutoReply"]
-    auto --> photon
-    user -->|"ask a question"| memory["Read-only recall_memory tool"]
-    graph --> memory
-    memory -->|"BM25-selected records and source IDs"| answer["Answer with links to Graph sources"]
-    answer --> user
-```
+![Architecture: web and phone input feed AI analysis and a reviewed graph; the graph supports memory recall and approved Photon messaging, with replies returned through a signed webhook.](assets/architecture.svg)
 
 The web app uses React, TypeScript, React Flow and Vite. The TypeScript backend uses Fastify, Mastra-powered model calls and SQLite. Structured outputs are validated before saving; message authorization, webhook verification, matching, state transitions and duplicate-send handling are controlled by application logic rather than left to the model.
 
