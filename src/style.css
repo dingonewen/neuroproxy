@@ -164,6 +164,7 @@ main{display:grid;grid-template-columns:minmax(245px,1fr) minmax(245px,1.08fr) m
 .conversation-panel{grid-column:3;grid-row:1 / 3;min-width:0}
 .delegation-panel{grid-column:1;grid-row:2 / 4;min-width:0}
 .graph{grid-column:2 / 4;grid-row:3;position:static;min-width:0}
+section.graph{top:auto}
 .graph>h2{margin:12px 0}
 .graph .canvas{height:55vh;min-height:380px}
 @media(max-width:1050px){main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto;gap:18px}.brand{grid-column:1;grid-row:1}.recovery-panel{grid-column:2;grid-row:1}.conversation-panel{grid-column:1 / -1;grid-row:2}.graph{grid-column:1 / -1;grid-row:3}.delegation-panel{grid-column:1 / -1;grid-row:4}}
@@ -251,8 +252,10 @@ main{display:grid;grid-template-columns:minmax(245px,1fr) minmax(245px,1.08fr) m
 /* BoldKit interaction: strong type, crisp press states and clear focus. */
 button:not(.text-button):not(.info-trigger):not(.react-flow__controls-button):not(.voice-switch){font-family:'Outfit Variable',system-ui,sans-serif;font-weight:700;letter-spacing:.04em;text-transform:uppercase;transition:transform 150ms cubic-bezier(.22,1,.3,1.12),box-shadow 150ms cubic-bezier(.22,1,.3,1.12),background-color 150ms}
 button:not(.text-button):not(.info-trigger):not(.react-flow__controls-button):not(.voice-switch):hover:not(:disabled),button:not(.text-button):not(.info-trigger):not(.react-flow__controls-button):not(.voice-switch):active:not(:disabled){transform:translate(3px,3px);box-shadow:none}
-input:not([type="checkbox"]),textarea,select{transition:box-shadow 150ms cubic-bezier(.22,1,.3,1.12),border-color 150ms;box-shadow:2px 2px 0 hsl(var(--shadow-color))}
-input:not([type="checkbox"]):focus,textarea:focus,select:focus{border-color:hsl(var(--foreground));box-shadow:4px 4px 0 hsl(var(--shadow-color))}
+input:not([type="checkbox"]):not([type="radio"]),textarea:not(.insight-expanding-input){transition:transform 150ms cubic-bezier(.22,1,.3,1.12),box-shadow 150ms cubic-bezier(.22,1,.3,1.12),border-color 150ms;box-shadow:4px 4px 0 hsl(var(--shadow-color))}
+input:not([type="checkbox"]):not([type="radio"]):focus,textarea:not(.insight-expanding-input):focus{border-color:hsl(var(--foreground));transform:translate(4px,4px);box-shadow:none}
+select{transition:box-shadow 150ms cubic-bezier(.22,1,.3,1.12),border-color 150ms;box-shadow:2px 2px 0 hsl(var(--shadow-color))}
+select:focus{border-color:hsl(var(--foreground));box-shadow:4px 4px 0 hsl(var(--shadow-color))}
 .voice-switch-row{display:flex;align-items:center;gap:9px;min-height:32px}
 button.voice-switch{position:relative;display:inline-flex;align-items:center;flex:none;width:48px;height:27px;padding:2px;border:3px solid hsl(var(--border));border-radius:0;background:hsl(var(--muted))!important;box-shadow:3px 3px 0 hsl(var(--shadow-color));transition:background-color 150ms,box-shadow 150ms;transform:none}
 button.voice-switch[aria-checked="true"]{background:hsl(var(--primary))!important}
@@ -397,6 +400,12 @@ section.conversation-panel,section.graph,section.delegation-panel,section.recove
 .graph-conversation-controls .graph-actions{flex:0 0 auto;position:static;gap:8px;margin:0}
 .graph-conversation-controls .graph-actions button{font-size:.76rem;padding:7px 10px;white-space:nowrap}
 .graph .canvas{margin-top:12px}
+.canvas .bold-graph-controls{display:flex;flex-direction:column;gap:4px;border:0;overflow:visible;background:transparent;box-shadow:none}
+.canvas .bold-graph-controls .react-flow__controls-button{width:21px;height:21px;padding:3px;border:2px solid hsl(var(--border));background:hsl(var(--accent));color:hsl(var(--foreground));box-shadow:2px 2px 0 hsl(var(--shadow-color));transition:transform 150ms,box-shadow 150ms}
+.canvas .bold-graph-controls .react-flow__controls-button:hover,.canvas .bold-graph-controls .react-flow__controls-button:active{transform:translate(2px,2px);box-shadow:none}
+.canvas .bold-graph-controls .react-flow__controls-button svg{width:100%;height:100%;max-width:none;max-height:none;fill:none;stroke:currentColor;stroke-width:2.5}
+.canvas .bold-graph-controls .react-flow__controls-button:focus-visible{outline:3px solid hsl(var(--primary));outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.canvas .bold-graph-controls .react-flow__controls-button{transition:none}.canvas .bold-graph-controls .react-flow__controls-button:hover,.canvas .bold-graph-controls .react-flow__controls-button:active{transform:none}}
 @media(min-width:1051px){.graph .canvas{height:max(710px,calc(100vh - 80px));min-height:710px}}
 @media(max-width:440px){.graph-conversation-controls{gap:5px}.graph-conversation-controls .graph-actions{gap:5px}.graph-conversation-controls .graph-actions button{padding:7px 6px;font-size:.65rem}}
 section.conversation-panel,section.graph,section.delegation-panel,section.recovery-panel,.brand{transition:transform 150ms cubic-bezier(.22,1,.3,1.12),box-shadow 150ms cubic-bezier(.22,1,.3,1.12)}
@@ -434,6 +443,7 @@ section.conversation-panel,section.graph,section.delegation-panel,section.recove
 /* Quiet, icon-only contextual help. */
 button.info-trigger{width:18px;height:18px;border:0;background:transparent;color:#786b70;box-shadow:none;padding:1px}
 button.info-trigger:hover:not(:disabled){color:hsl(var(--foreground));transform:none;box-shadow:none}
+.info-popover.info-popover-portal{position:fixed;z-index:2147483647;top:auto;left:auto;visibility:visible;opacity:1;background:hsl(var(--accent));color:#fff;pointer-events:none}
 .info-trigger svg{width:16px;height:16px;stroke-width:2}
 
 /* Mobile navigation reuses the same local workflow and approval controls. */
@@ -448,6 +458,8 @@ button.info-trigger:hover:not(:disabled){color:hsl(var(--foreground));transform:
  .conversation-panel .conversation-textarea{flex:0 0 auto;height:72px;min-height:72px;max-height:min(40vh,320px);resize:vertical}
  .recovery-panel{height:100%;min-height:0;overflow-y:auto}
  .delegation-panel .manual-delegation{flex:0 0 auto;overflow:visible}
+ .delegation-panel,.graph{align-self:stretch;height:100%;min-height:0}
+ .graph .canvas{flex:1 1 0;min-height:0;height:auto}
 }
 /* Keep selects within their cards; native option rendering varies by browser. */
 select{box-sizing:border-box;min-width:0;max-width:100%;text-overflow:ellipsis}
