@@ -1,5 +1,7 @@
 # NeuroProxy
 
+<img src="assets/logo.png" alt="NeuroProxy brain logo and tagline" width="200">
+
 **For minds that wander, and hearts that care.**
 
 NeuroProxy is a voice-first companion that helps neurodivergent people remember, connect, and communicate. It turns a conversation into a reviewable Cognitive Action Graph, helps its user take a next step through iMessage, and remembers the context when a reply comes back.
@@ -7,6 +9,8 @@ NeuroProxy is a voice-first companion that helps neurodivergent people remember,
 I built NeuroProxy from my own experience with ADHD: I can care deeply about someone and still lose track of what they said, miss a message, or struggle to find the words to reply. I want the people around me to know that even when my mind wanders, my heart cares. [Read the project vision](docs/VISION.md).
 
 NeuroProxy is an accessibility and communication aid, not a medical device. It does not diagnose or treat a condition.
+
+<img src="assets/NeuroProxy-start.jpg" alt="NeuroProxy's desktop workspace, with conversation understanding, Graph, messaging, and context recovery panels" width="720">
 
 ## From a conversation to a connection
 
@@ -18,6 +22,10 @@ Imagine telling NeuroProxy that you want to reconnect with a friend but are unsu
 4. **Find Your Way Back.** Ask a question about saved context or message history. A read-only memory tool retrieves relevant Graph records and can show sources that link back to the Graph. Supported browsers can read the answer aloud.
 
 The desktop and mobile web interfaces share this workflow. On mobile, colored tabs and horizontal swipes switch sections while the Graph retains its own gestures. Neither a native iOS app nor a second phone is required for the developer's test setup.
+
+<img src="assets/NeuroProxy-process.jpg" alt="A saved conversation in NeuroProxy, showing relationship context, a message exchange, a pending draft, and its Cognitive Action Graph" width="720">
+
+*A conversation in progress: reviewed context, messages, and the Graph stay together.*
 
 ## Why this is an agent
 
