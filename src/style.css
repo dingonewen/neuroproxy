@@ -462,7 +462,7 @@ button.info-trigger:hover:not(:disabled){color:hsl(var(--foreground));transform:
 .end-conversation-actions{display:flex;justify-content:flex-end;margin-top:10px}
 .end-conversation-actions .end-conversation-button{background:hsl(var(--primary));color:hsl(var(--foreground));border:2px solid hsl(var(--border));box-shadow:3px 3px 0 hsl(var(--shadow-color))}
 .auto-reply-section{flex:0 0 auto;border-top:1px solid hsl(var(--border)/.2);margin-top:12px;padding-top:12px}
-.auto-reply-section .delegations-heading{margin:0 0 8px}
+.auto-reply-section>summary{cursor:pointer;font-size:.8rem;font-weight:700;line-height:1.35}
 .auto-reply-section label{font-size:.8rem;margin:8px 0}
 .auto-reply-section select,.auto-reply-section textarea{font-size:.8rem}
 .auto-reply-section textarea{min-height:46px;max-height:100px;resize:vertical}
