@@ -104,3 +104,5 @@ main :is(.review,.reply-insights) .review-actions button.review-discard-button {
 .draft-actions .draft-revisit-row {display:flex;width:100%;justify-content:flex-end;}
 .draft-actions .draft-revisit-button {margin-left:auto;}
 main .saved-node button.revisit-button {display:block;margin-left:auto;}
+main .reply-review-actions button.confirm-reply-button {background:hsl(var(--secondary));color:hsl(var(--secondary-foreground));}
+main .reply-review-actions button.not-reply-button {background:var(--neuroproxy-blue);color:hsl(var(--foreground));}

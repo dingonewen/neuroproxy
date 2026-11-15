@@ -25,6 +25,12 @@ Imagine telling NeuroProxy that you want to reconnect with a friend but are unsu
 
 The desktop and mobile web interfaces share this workflow. On mobile, colored tabs and horizontal swipes switch sections while the Graph retains its own gestures. Neither a native iOS app nor a second phone is required for the developer's test setup.
 
+<p align="center">
+  <img src="assets/iOS_demo_1.jpeg" alt="NeuroProxy mobile workflow, first screen" width="170">
+  <img src="assets/iOS_demo_2.jpeg" alt="NeuroProxy mobile workflow, second screen" width="170">
+  <img src="assets/iOS_demo_3.jpeg" alt="NeuroProxy mobile workflow, third screen" width="170">
+</p>
+
 <p align="center"><img src="assets/NeuroProxy-process.jpg" alt="A saved conversation showing relationship context, a message exchange, a pending draft, and its Cognitive Action Graph" width="500"></p>
 
 *A conversation in progress: reviewed context, messages, and the Graph stay together.*
@@ -121,6 +127,29 @@ For private phone access, use a separate HTTPS hostname protected by Cloudflare 
 ### Public interactive preview
 
 Run `npm run build:preview` to create a separate static site in `dist-preview/`. Upload the contents of that folder to a static host, such as Cloudflare Pages. This build displays a preview notice, returns an empty graph locally, blocks application requests, and disables browser voice recognition; AI, saving and messaging do not work. A preview-only Content Security Policy blocks network connections as a second layer. Text typed into the interface is held in the page and cleared on reload. Deploy the static output only, never `.env`, the database, or the backend.
+
+### Deployment scope
+
+The public preview and the working agent are separate experiences:
+
+| Mode | Purpose | Availability |
+| --- | --- | --- |
+| Public static preview | Explore the desktop/mobile UI without AI calls or real messages. | Independent of the developer's laptop once uploaded. |
+| Private working demo | Use analysis, saved memory, approved iMessage and AutoReply. | The local backend, frontend and HTTPS tunnel must remain running; laptop sleep or a stopped process interrupts the workflow. |
+| Future hosted agent | Receive messages and run authorized AutoReply while the laptop is offline. | Requires a production deployment; this repository does not yet include a complete production deployment configuration. |
+
+For a hosted agent, serve the production frontend build and proxy `/api` to the Node backend on the same origin. The current frontend proxy is a Vite development setting, and the backend currently binds to `127.0.0.1:3000`; hosting must account for those settings. Use a persistent volume for `NEUROPROXY_DB`, keep the agent on a single backend instance initially, back up SQLite, and store provider credentials in the host's secret configuration. Protect user-facing APIs with authentication and add usage limits before granting public access. Provider callbacks need separately reachable routes with their existing signature or bearer-token verification. Moving only the frontend to a static host does not make the agent available while the laptop is offline.
+
+### Demo troubleshooting
+
+| Symptom | Check and recovery |
+| --- | --- |
+| A phone reply does not appear in the selected conversation | Check the unlinked messages in the Graph conversation selector. Multiple waiting delegations for the same Photon conversation can make matching ambiguous. Select the reply node, choose its delegation and use **Confirm this is a reply**. |
+| **Confirm Reply** appears below an incoming message | The match is provisional. Confirm it to continue analysis, or choose **Not a Reply** to leave it unlinked. |
+| Recipient consent checkbox is disabled after saving a contact | A contact record alone is insufficient: a matching received iMessage session must exist. If deleting old conversations removed the last session, ask the consenting recipient to send a **new** iMessage to the assigned Photon number, then reload the page. |
+| The local page or API will not start | Run commands from the repository directory. The backend uses port 3000; Vite uses 5173 with `strictPort`, so it fails rather than silently moving to a different port. Check for an existing instance before restarting. |
+
+Success confirmations disappear after 10 seconds. Errors, loading indicators and actionable message states remain visible. Deleting local history does not undo messages on the recipient's phone; preserve any context you need before resetting a demo.
 
 ## Privacy and limits
 
