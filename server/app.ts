@@ -16,6 +16,25 @@ import type { ReplyProgress } from '../shared/reply-progress.ts';
 export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
+async function processAutoReply(messageId:string) {
+  let initial:ReturnType<Store['autoReplyMatch']>;
+  try {initial=store.autoReplyMatch(messageId);if(!initial || !store.claimAutoReply(initial.replyId))return;} catch{return;}
+  let draftId:string|undefined;
+  let reserved=false;
+  try {
+    const context=store.replyAnalysisContext(initial.replyId);
+    const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer({...context,stylePreferences:initial.preferences})));
+    const text=analysis.suggestedReply?.trim();
+    if(!text){store.finishAutoReply(initial.replyId,'needs_review');return;}
+    const current=store.autoReplyMatch(messageId);
+    if(!current || current.authorizationId!==initial.authorizationId || current.personId!==initial.personId || current.spaceId!==initial.spaceId || current.senderId!==initial.senderId || current.recipientId!==initial.recipientId || current.handle.toLowerCase()!==initial.handle.toLowerCase()){store.finishAutoReply(initial.replyId,'cancelled');return;}
+    const created=store.createReplyDraft(initial.replyId,text,analysis.relationship.nextAction || 'Reply');draftId=created.id;
+    store.finishAutoReply(initial.replyId,'processing',draftId);
+    const dispatch=store.reservePhoton(draftId,current.spaceId,current.senderId,current.recipientId,text,current.handle,'',false);reserved=true;
+    const sent=await photon.send({spaceId:current.spaceId,senderId:current.senderId,recipientId:current.recipientId,recipientPhone:current.handle},dispatch.body,dispatch.key,current.parentMessageId);
+    store.finishPhoton(draftId,sent);reserved=false;store.finishAutoReply(initial.replyId,sent?'submitted':'unknown',draftId);
+  } catch {if(reserved && draftId){try{store.finishPhoton(draftId,null);}catch{}store.finishAutoReply(initial.replyId,'unknown',draftId);}else store.finishAutoReply(initial.replyId,'failed',draftId);}
+}
 app.register(async (webhook) => {
   webhook.removeContentTypeParser('application/json');
   webhook.addContentTypeParser('application/json', { parseAs: 'buffer', bodyLimit: 65536 }, (_req, body, done) => done(null, body));
@@ -30,7 +49,7 @@ app.register(async (webhook) => {
     if (content && typeof content.type === 'string' && content.type !== 'text') return reply.code(204).send();
     const message = parsePhotonMessage(delivery, webhookConfig.projectId);
     if (!message) return reply.code(400).send({ error: 'Invalid message event.' });
-    try { store.receivePhoton(message); }
+    try { store.receivePhoton(message);if(message.imessage)void processAutoReply(message.messageId); }
     catch { return reply.code(503).send({ error: 'Unable to store webhook event.' }); }
     return reply.code(204).send();
   });
@@ -50,6 +69,8 @@ app.get('/api/imessage-conversations', async () => ({conversations:store.imessag
 app.patch('/api/nodes/:id', async req => {const b=req.body as {expectedLabel?:unknown;label?:unknown}|null;store.reviseNode((req.params as {id:string}).id,b?.expectedLabel,b?.label);return {ok:true};});
 app.delete('/api/conversations/:id', async req => {store.deleteConversation((req.params as {id:string}).id);return {ok:true};});
 app.post('/api/conversations/:id/end', async req => {store.endConversation((req.params as {id:string}).id);return {ok:true};});
+app.get('/api/conversations/:id/auto-reply', async req => {const id=(req.params as {id:string}).id;store.assertConversationOpen(id);return store.autoReplySettings(id);});
+app.put('/api/conversations/:id/auto-reply', async req => {const id=(req.params as {id:string}).id;const body=req.body as {enabled?:unknown;personId?:unknown;preferences?:unknown;consent?:unknown}|null;if(typeof body?.enabled!=='boolean' || (body.enabled && body.consent!==true))throw Error('Confirm authorization before enabling AutoReply.');store.setAutoReply(id,body.personId,body.preferences,body.enabled);return store.autoReplySettings(id);});
 app.get('/api/photon-inbox/:id/candidates', async req => ({candidates:store.photonCandidates((req.params as {id:string}).id)}));
 app.post('/api/photon-inbox/:id/link', async (req,reply) => {
   const draftId=(req.body as {draftId?:unknown}|null)?.draftId;

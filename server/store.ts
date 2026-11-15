@@ -7,6 +7,7 @@ import { formatImessage, labelRealSms } from '../shared/sms.ts';
 import { replyProgressSchema, type ReplyProgress } from '../shared/reply-progress.ts';
 
 const eventHash=(value:string)=>createHash('sha256').update(value).digest('hex');
+const stopAutoReply=(text:string)=>/\b(stop|unsubscribe|opt\s*out|do not (?:contact|message|text)|don['’]t (?:contact|message|text)|leave me alone)\b|不要再联系|别再联系|停止联系/i.test(text);
 
 export class Store {
   db: DatabaseSync;
@@ -24,6 +25,12 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS reply_insights_reviewed (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS reply_progress (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, stage TEXT NOT NULL, data TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS ended_conversations (topic_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS auto_reply_settings (topic_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, person_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE, space_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL, handle TEXT NOT NULL, preferences TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 0, authorization_id TEXT NOT NULL DEFAULT '', enabled_after INTEGER NOT NULL DEFAULT 0, enabled_at_ms INTEGER NOT NULL DEFAULT 0); CREATE TABLE IF NOT EXISTS auto_reply_jobs (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, draft_id TEXT REFERENCES drafts(id) ON DELETE SET NULL, status TEXT NOT NULL);`);
+    if(!this.db.prepare('PRAGMA table_info(auto_reply_settings)').all().some(column=>column.name==='authorization_id'))this.db.exec("ALTER TABLE auto_reply_settings ADD COLUMN authorization_id TEXT NOT NULL DEFAULT ''");
+    if(!this.db.prepare('PRAGMA table_info(auto_reply_settings)').all().some(column=>column.name==='enabled_after'))this.db.exec('ALTER TABLE auto_reply_settings ADD COLUMN enabled_after INTEGER NOT NULL DEFAULT 0');
+    if(!this.db.prepare('PRAGMA table_info(auto_reply_settings)').all().some(column=>column.name==='enabled_at_ms'))this.db.exec('ALTER TABLE auto_reply_settings ADD COLUMN enabled_at_ms INTEGER NOT NULL DEFAULT 0');
+    this.db.exec('CREATE TABLE IF NOT EXISTS auto_reply_inbox_order (sequence INTEGER PRIMARY KEY AUTOINCREMENT, node_id TEXT NOT NULL UNIQUE REFERENCES nodes(id) ON DELETE CASCADE, created_at_ms INTEGER)');
+    if(!this.db.prepare('PRAGMA table_info(auto_reply_inbox_order)').all().some(column=>column.name==='created_at_ms'))this.db.exec('ALTER TABLE auto_reply_inbox_order ADD COLUMN created_at_ms INTEGER');
   }
   contacts() {return this.db.prepare('SELECT id,name,handle FROM contacts ORDER BY name COLLATE NOCASE,id').all();}
   createContact(name:unknown,handle:unknown) {
@@ -39,6 +46,7 @@ export class Store {
   deleteContact(id:string) {
     this.db.exec('BEGIN IMMEDIATE');try {
       if(this.db.prepare("SELECT 1 FROM person_contacts p JOIN drafts d ON d.person_id=p.person_id WHERE p.contact_id=? AND d.state IN ('preparing','submitting') LIMIT 1").get(id))throw Error('A message to this contact is being sent. Try again after it finishes.');
+      this.db.prepare('UPDATE auto_reply_settings SET enabled=0,authorization_id=? WHERE person_id IN (SELECT person_id FROM person_contacts WHERE contact_id=?)').run(randomUUID(),id);
       if(!this.db.prepare('DELETE FROM contacts WHERE id=?').run(id).changes)throw Error('Contact not found.');
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
@@ -56,6 +64,7 @@ export class Store {
         const matches=(handle:string)=>handle.trim().toLowerCase()===target.handle.trim().toLowerCase();
         if(!(previous ? matches(previous.handle) : history.length>0 && history.every(entry=>matches(entry.handle)))) throw Error('This person has message history and cannot be rebound to a different or unverified address.');
       }
+      if(current?.contact_id!==contactId)this.db.prepare('UPDATE auto_reply_settings SET enabled=0,authorization_id=? WHERE person_id=?').run(randomUUID(),personId);
       this.db.prepare('INSERT INTO person_contacts VALUES (?,?) ON CONFLICT(person_id) DO UPDATE SET contact_id=excluded.contact_id').run(personId,contactId);
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
@@ -110,7 +119,7 @@ export class Store {
   }
   node(kind: string, label: string, status = '', source = 'user') { const id = randomUUID(); this.db.prepare('INSERT INTO nodes VALUES (?,?,?,?,?)').run(id, kind, label, status, source); return id; }
   edge(source: string, target: string, label: string) { this.db.prepare('INSERT INTO edges VALUES (?,?,?,?)').run(randomUUID(), source, target, label); }
-  graph() { return { nodes: this.db.prepare('SELECT nodes.*, EXISTS(SELECT 1 FROM reply_insights_reviewed rir WHERE rir.reply_id=nodes.id) AS analysis_reviewed, EXISTS(SELECT 1 FROM ended_conversations ec WHERE ec.topic_id=nodes.id) AS conversation_ended, c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM nodes LEFT JOIN person_contacts pc ON pc.person_id=nodes.id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY nodes.rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label,c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id LEFT JOIN person_contacts pc ON pc.person_id=drafts.person_id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY drafts.rowid DESC').all() }; }
+  graph() { return { nodes: this.db.prepare('SELECT nodes.*, EXISTS(SELECT 1 FROM reply_insights_reviewed rir WHERE rir.reply_id=nodes.id) AS analysis_reviewed, EXISTS(SELECT 1 FROM ended_conversations ec WHERE ec.topic_id=nodes.id) AS conversation_ended, c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle FROM nodes LEFT JOIN person_contacts pc ON pc.person_id=nodes.id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY nodes.rowid').all(), edges: this.db.prepare('SELECT * FROM edges ORDER BY rowid').all(), drafts: this.db.prepare('SELECT drafts.*, nodes.source AS transport, photon_message_labels.label AS message_label,c.id AS contact_id,c.name AS contact_name,c.handle AS contact_handle, EXISTS(SELECT 1 FROM auto_reply_jobs j WHERE j.draft_id=drafts.id) AS auto_generated FROM drafts JOIN nodes ON nodes.id=drafts.message_id LEFT JOIN photon_message_labels ON photon_message_labels.draft_id=drafts.id LEFT JOIN person_contacts pc ON pc.person_id=drafts.person_id LEFT JOIN contacts c ON c.id=pc.contact_id ORDER BY drafts.rowid DESC').all() }; }
   conversationForNode(nodeId:string) {
     const graph=this.graph();
     return groupGraph(graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)})),graph.edges.map(e=>({source:String(e.source),target:String(e.target)}))).find(g=>g.id!=='unlinked' && g.nodeIds.has(nodeId));
@@ -125,6 +134,32 @@ export class Store {
     if(!draft)throw Error('Draft not found.');
     this.assertConversationOpen(draft.message_id);
   }
+  autoReplySettings(topicId:string) {
+    const settings=this.db.prepare('SELECT person_id AS personId,preferences,enabled FROM auto_reply_settings WHERE topic_id=?').get(topicId) as {personId:string;preferences:string;enabled:number}|undefined;
+    if(!settings)return {enabled:false,personId:'',preferences:'',lastStatus:null};
+    const job=this.db.prepare("SELECT j.status FROM auto_reply_jobs j JOIN edges e ON e.target=j.reply_id AND e.label='reply' JOIN drafts d ON d.message_id=e.source WHERE d.person_id=? ORDER BY j.rowid DESC LIMIT 1").get(settings.personId) as {status:string}|undefined;
+    return {...settings,enabled:!!settings.enabled,lastStatus:job?.status ?? null};
+  }
+  setAutoReply(topicId:string, personId:unknown, preferences:unknown, enabled:boolean) {
+    const group=this.conversationForNode(topicId);
+    if(!group || group.id!==topicId)throw Error('Choose a saved conversation.');
+    this.assertConversationOpen(topicId);
+    if(!enabled){this.db.prepare('UPDATE auto_reply_settings SET enabled=0,authorization_id=? WHERE topic_id=?').run(randomUUID(),topicId);return;}
+    if(typeof personId!=='string' || !group.nodeIds.has(personId) || typeof preferences!=='string' || preferences.length>1000)throw Error('Choose a person in this conversation and enter up to 1,000 characters of preferences.');
+    const target=this.db.prepare(`SELECT p.space_id,p.sender_id,p.recipient_id,c.handle FROM drafts d JOIN photon_dispatches p ON p.draft_id=d.id AND p.status='submitted' JOIN photon_preparations prep ON prep.draft_id=d.id JOIN person_contacts pc ON pc.person_id=d.person_id JOIN contacts c ON c.id=pc.contact_id JOIN photon_inbox i ON i.space_id=p.space_id AND i.sender_id=p.recipient_id AND i.recipient_id=p.sender_id JOIN imessage_sessions s ON s.node_id=i.node_id AND lower(s.human_handle)=lower(c.handle) WHERE d.person_id=? AND lower(prep.recipient_phone)=lower(c.handle) ORDER BY p.rowid DESC LIMIT 1`).get(personId) as {space_id:string;sender_id:string;recipient_id:string;handle:string}|undefined;
+    if(!target)throw Error('First select a contact and send them an approved iMessage in this conversation.');
+    const cutoff=this.db.prepare("SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name='auto_reply_inbox_order'),0) AS value").get() as {value:number};
+    this.db.prepare('INSERT INTO auto_reply_settings (topic_id,person_id,space_id,sender_id,recipient_id,handle,preferences,enabled,authorization_id,enabled_after,enabled_at_ms) VALUES (?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(topic_id) DO UPDATE SET person_id=excluded.person_id,space_id=excluded.space_id,sender_id=excluded.sender_id,recipient_id=excluded.recipient_id,handle=excluded.handle,preferences=excluded.preferences,enabled=1,authorization_id=excluded.authorization_id,enabled_after=excluded.enabled_after,enabled_at_ms=excluded.enabled_at_ms').run(topicId,personId,target.space_id,target.sender_id,target.recipient_id,target.handle,preferences.trim(),randomUUID(),cutoff.value,Date.now());
+  }
+  autoReplyMatch(messageId:string) {
+    const row=this.db.prepare(`SELECT n.id AS replyId,d.person_id AS personId,s.space_id AS spaceId,s.sender_id AS senderId,s.recipient_id AS recipientId,s.handle,s.preferences,s.authorization_id AS authorizationId,i.message_id AS parentMessageId FROM photon_inbox i JOIN auto_reply_inbox_order ord ON ord.node_id=i.node_id JOIN imessage_sessions ims ON ims.node_id=i.node_id JOIN nodes n ON n.id=i.node_id AND n.status='received' JOIN edges e ON e.target=n.id AND e.label='reply' JOIN drafts d ON d.message_id=e.source AND d.state='reply_received' JOIN auto_reply_settings s ON s.person_id=d.person_id AND s.enabled=1 AND ord.sequence>s.enabled_after AND ord.created_at_ms>=s.enabled_at_ms AND s.space_id=i.space_id AND s.sender_id=i.recipient_id AND s.recipient_id=i.sender_id JOIN person_contacts pc ON pc.person_id=d.person_id JOIN contacts c ON c.id=pc.contact_id AND lower(c.handle)=lower(s.handle) AND lower(ims.human_handle)=lower(s.handle) WHERE i.message_id=?`).get(messageId) as {replyId:string;personId:string;spaceId:string;senderId:string;recipientId:string;handle:string;preferences:string;authorizationId:string;parentMessageId:string}|undefined;
+    if(!row)return null;
+    const group=this.conversationForNode(row.replyId);
+    if(!group || this.db.prepare('SELECT 1 FROM ended_conversations WHERE topic_id=?').get(group.id))return null;
+    return row;
+  }
+  claimAutoReply(replyId:string) {return !!this.db.prepare("INSERT OR IGNORE INTO auto_reply_jobs (reply_id,status) VALUES (?,'processing')").run(replyId).changes;}
+  finishAutoReply(replyId:string,status:string,draftId?:string) {this.db.prepare('UPDATE auto_reply_jobs SET status=?,draft_id=COALESCE(?,draft_id) WHERE reply_id=?').run(status,draftId??null,replyId);}
   endConversation(topicId:string) {
     this.db.exec('BEGIN IMMEDIATE');
     try {
@@ -133,6 +168,7 @@ export class Store {
       const drafts=this.graph().drafts.filter(d=>group.nodeIds.has(String(d.message_id)));
       if(drafts.some(d=>d.state==='preparing'||d.state==='submitting'))throw Error('A message is being sent. Try again after it finishes.');
       this.db.prepare('INSERT OR IGNORE INTO ended_conversations VALUES (?)').run(topicId);
+      this.db.prepare('UPDATE auto_reply_settings SET enabled=0 WHERE topic_id=?').run(topicId);
       this.db.exec('COMMIT');
     } catch(error){this.db.exec('ROLLBACK');throw error;}
   }
@@ -201,15 +237,25 @@ export class Store {
       if(deleted) {this.db.exec('COMMIT');return false;}
       const existing = this.db.prepare('SELECT 1 FROM photon_inbox WHERE event_id=? OR message_id=?').get(message.eventId, message.messageId);
       if (existing) { this.db.exec('COMMIT'); return false; }
+      if(message.imessage && stopAutoReply(message.body))this.db.prepare('UPDATE auto_reply_settings SET enabled=0,authorization_id=? WHERE enabled=1 AND space_id=? AND sender_id=? AND recipient_id=? AND lower(handle)=lower(?)').run(randomUUID(),message.spaceId,message.recipientId,message.senderId,message.imessage.humanHandle);
       type Match = {id:string;task_id:string;person_id:string;message_id:string};
       let match = message.parentMessageId ? this.db.prepare(`SELECT d.task_id, d.person_id, d.message_id, d.id FROM photon_dispatches p JOIN drafts d ON d.id=p.draft_id WHERE p.photon_message_id=? AND p.space_id=? AND p.sender_id=? AND p.recipient_id=? AND d.state='waiting_for_reply'`).get(message.parentMessageId, message.spaceId, message.recipientId, message.senderId) as Match|undefined : undefined;
       let inferred=false;
       if (!message.parentMessageId && message.createdAt && Number.isFinite(Date.parse(message.createdAt))) {
         const candidates=this.db.prepare(`SELECT d.task_id,d.person_id,d.message_id,d.id, prep.approved_at FROM photon_dispatches p JOIN drafts d ON d.id=p.draft_id JOIN photon_preparations prep ON prep.draft_id=d.id WHERE p.space_id=? AND p.sender_id=? AND p.recipient_id=? AND d.state='waiting_for_reply'`).all(message.spaceId,message.recipientId,message.senderId) as (Match & {approved_at:string})[];
-        if(candidates.length===1 && Date.parse(message.createdAt)>=Date.parse(candidates[0].approved_at)) {match=candidates[0]; inferred=true;}
+        if(candidates.length===1 && Date.parse(message.createdAt)>=Date.parse(candidates[0].approved_at)) {
+          match=candidates[0]; inferred=true;
+          if(message.imessage && !stopAutoReply(message.body)) {
+            const group=this.conversationForNode(match.message_id);
+            const allowed=group && this.db.prepare('SELECT 1 FROM auto_reply_settings s JOIN person_contacts pc ON pc.person_id=s.person_id JOIN contacts c ON c.id=pc.contact_id WHERE s.topic_id=? AND s.person_id=? AND s.enabled=1 AND s.space_id=? AND s.sender_id=? AND s.recipient_id=? AND lower(s.handle)=lower(?) AND lower(c.handle)=lower(s.handle)').get(group.id,match.person_id,message.spaceId,message.recipientId,message.senderId,message.imessage.humanHandle);
+            if(allowed && !this.db.prepare('SELECT 1 FROM ended_conversations WHERE topic_id=?').get(group!.id))inferred=false;
+          }
+        }
       }
       const nodeId = this.node('reply', message.body, match ? (inferred ? 'possible_reply' : 'received') : 'unlinked', 'photon');
       this.db.prepare('INSERT INTO photon_inbox VALUES (?,?,?,?,?,?)').run(message.eventId, message.messageId, message.spaceId, message.senderId, message.recipientId, nodeId);
+      const createdAt=Date.parse(message.createdAt ?? '');
+      this.db.prepare('INSERT INTO auto_reply_inbox_order (node_id,created_at_ms) VALUES (?,?)').run(nodeId,Number.isFinite(createdAt)?createdAt:null);
       if(message.imessage) this.db.prepare('INSERT INTO imessage_sessions VALUES (?,?,?)').run(nodeId,message.imessage.humanHandle,message.imessage.agentHandle);
       if (match) {
         this.edge(match.message_id, nodeId, inferred ? 'possible reply' : 'reply'); this.edge(match.person_id, nodeId, 'from');
