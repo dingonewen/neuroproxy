@@ -1,0 +1,106 @@
+/* Shared scale for editing, review, and saved states. Keep dashboard geometry in style.css. */
+:root {
+ --workflow-body:.8rem;
+ --workflow-label:.75rem;
+ --workflow-button:.72rem;
+ --workflow-section:1.1rem;
+ --workflow-gap:8px;
+}
+
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail,.suggested-delegation) {
+ font-size:var(--workflow-body);
+ line-height:1.5;
+ min-width:0;
+}
+
+main :is(.review,.saved-context) .review-heading :is(h3,.saved-context-subtitle) {margin:0;}
+main :is(.review,.saved-context) .review-heading h3 {
+ font-size:var(--workflow-section);
+ line-height:1.25;
+ font-weight:750;
+ letter-spacing:-.025em;
+ color:#332747;
+}
+main .review .review-heading {margin-bottom:12px;}
+main .review .review-heading p {font-size:var(--workflow-label);line-height:1.5;margin:5px 0 0;}
+
+main :is(.review,.saved-context) .topic-card {padding:12px;}
+main .review .review-topic-card {display:block;}
+main .review :is(.saved-relationship-group,.saved-relationship-grid>.nested-card) {break-inside:avoid;}
+main .review .saved-relationship-group {border-top:0;padding-top:0;}
+main :is(.review,.saved-context) .category-card {padding:10px;min-width:0;}
+main :is(.review,.saved-context,.reply-insights) .nested-card {padding:8px;margin:7px 0;min-width:0;}
+main :is(.review,.saved-context,.reply-insights) :is(.saved-node-label,.field-caption) {font-size:var(--workflow-label);line-height:1.4;}
+main :is(.review,.saved-context,.reply-insights) .category-heading h4 {font-size:.9rem;line-height:1.3;}
+main :is(.review,.saved-context,.reply-insights) :is(.relationship-group,.saved-relationship-group) h5 {font-size:.84rem;line-height:1.35;margin:8px 0;}
+
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) label {
+ font-size:var(--workflow-label);
+ line-height:1.4;
+}
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea:not(.insight-expanding-input)) {
+ max-width:100%;
+ min-width:0;
+ font-size:var(--workflow-body);
+ line-height:1.5;
+ font-weight:400;
+ padding:8px;
+}
+main :is(.review,.saved-context,.reply-insights) .insight-expanding-input {
+ font-size:var(--workflow-body);
+ line-height:1.55;
+ font-weight:400;
+}
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) textarea:not(.insight-expanding-input) {
+ resize:vertical;
+ overflow-wrap:anywhere;
+ min-height:80px;
+ max-height:300px;
+}
+
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) button:not(.text-button):not(.info-trigger):not(.voice-switch) {
+ font-size:var(--workflow-button);
+ line-height:1.3;
+ padding:5px 9px;
+ min-height:28px;
+ max-width:100%;
+ white-space:normal;
+ border:2px solid hsl(var(--border));
+ box-shadow:3px 3px 0 hsl(var(--shadow-color));
+}
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) button:not(.text-button):not(.info-trigger):not(.voice-switch):is(:hover,:active):not(:disabled) {box-shadow:none;}
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) button:disabled {box-shadow:none;}
+main .saved-node button.revisit-button {font-size:var(--workflow-button);line-height:1.3;padding:5px 9px;min-height:28px;}
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) button.text-button:not(.revisit-button) {
+ font-size:var(--workflow-button);
+ line-height:1.4;
+ padding:4px 0;
+ border:0;
+ box-shadow:none;
+}
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.manual-delegation,.node-detail) :is(.review-actions,.contact-actions,.manual-actions,.reply-review-actions) {
+ display:flex;
+ flex-wrap:wrap;
+ justify-content:flex-end;
+ align-items:center;
+ gap:var(--workflow-gap);
+ margin-top:10px;
+}
+main :is(.review,.saved-context,.reply-insights,.draft-actions,.node-detail,.suggested-delegation) :is(p[role="alert"],p[role="status"],.helper-text,small) {
+ font-size:.75rem;
+ line-height:1.5;
+}
+main .saved-node .saved-node-status {font-size:.68rem;}
+main .review .topic-title {font-size:var(--workflow-label);}
+main .node-detail>div>p {font-size:var(--workflow-label);color:#76618e;font-style:italic;}
+
+/* Review actions use the same Coral palette as the finished dashboard. */
+main :is(.review,.reply-insights) .review-actions button.review-save-button {background:hsl(var(--secondary));color:hsl(var(--secondary-foreground));}
+main :is(.review,.reply-insights) .review-actions button.review-discard-button {background:hsl(var(--primary));color:hsl(var(--primary-foreground));}
+
+.chat-message .chat-message-heading {align-items:flex-start;font-size:.7rem;line-height:1.4;}
+.chat-message .chat-message-heading :is(strong,.chat-pending-status) {font-size:inherit;line-height:inherit;font-weight:700;margin:0;}
+.chat-message .chat-message-heading .chat-pending-status {margin-left:auto;flex-shrink:0;white-space:nowrap;color:#fff;-webkit-text-stroke:.8px var(--neuroproxy-blue);paint-order:stroke fill;text-shadow:0 0 1px var(--neuroproxy-blue);}
+.draft-actions .draft-revisit-row {display:flex;width:100%;justify-content:flex-end;}
+.draft-actions .draft-revisit-button {margin-left:auto;}
+main .saved-node button.revisit-button {display:block;margin-left:auto;}
