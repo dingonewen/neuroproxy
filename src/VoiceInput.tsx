@@ -16,6 +16,7 @@ export function VoiceInput({onTranscript,onListeningChange,disabled=false,langua
  const Speech=(window as SpeechWindow).SpeechRecognition ?? (window as SpeechWindow).webkitSpeechRecognition;
  useEffect(()=>()=>{const current=recognition.current;if(current){current.onresult=null;current.onerror=null;current.onend=null;current.abort();recognition.current=null;}},[]);
  function start(){
+  if(__NEUROPROXY_PREVIEW__){setNotice('Voice input is disabled in the interactive preview. You can type instead.');return;}
   if(!Speech||recognition.current)return;
   const current=new Speech();recognition.current=current;current.lang=language;current.continuous=true;current.interimResults=true;
   current.onresult=e=>{let pending='';for(let i=e.resultIndex;i<e.results.length;i++){const item=e.results[i];const text=item[0]?.transcript ?? '';if(item.isFinal && text.trim()) callbacks.current.onTranscript(text.trim());else if(!item.isFinal)pending+=text;}setInterim(pending);};
@@ -24,7 +25,7 @@ export function VoiceInput({onTranscript,onListeningChange,disabled=false,langua
   try{setNotice('');current.start();setListening(true);callbacks.current.onListeningChange(true);}catch{recognition.current=null;setNotice('Could not start the microphone. Try again or type your message.');}
  }
  function stop(){if(!recognition.current||stopping)return;setStopping(true);try{recognition.current.stop();}catch{recognition.current.abort();}}
- if(!Speech)return <p className="helper-text">Voice input is unavailable in this browser. You can type instead.</p>;
+ if(!Speech && !__NEUROPROXY_PREVIEW__)return <p className="helper-text">Voice input is unavailable in this browser. You can type instead.</p>;
  const languageSelector=<div className="voice-language"><label htmlFor={languageId}>Language</label><InfoTip>Your browser may send audio to its speech recognition provider.</InfoTip><select id={languageId} value={language} disabled={listening||disabled} onChange={e=>setLanguage(e.target.value)}><option value="en-US">English</option><option value="zh-CN">中文</option></select></div>;
  return <div className="voice-input"><div className="voice-controls">{languageSlot ? createPortal(languageSelector,languageSlot) : languageSelector}<div className="voice-switch-row"><button className="voice-switch" role="switch" aria-checked={listening} aria-label="Voice input" type="button" disabled={disabled||stopping} onClick={listening?stop:start}><span className="voice-switch-thumb" aria-hidden="true"/></button><span className="voice-switch-label"><Mic className="button-icon" aria-hidden="true"/>{stopping?'Stopping…':listening?<span role="status">Listening<span className="listening-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></span>:'Start Voice'}</span></div></div>{interim && <p className="voice-interim" aria-live="polite">{interim}</p>}{notice && <p role="status">{notice}</p>}</div>;
 }

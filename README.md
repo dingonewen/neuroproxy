@@ -134,6 +134,10 @@ npm run build
 
 For private phone access, use a separate HTTPS hostname protected by Cloudflare Access and restricted to your account. Set `NEUROPROXY_WEB_HOST` to that exact hostname, restart Vite, and route the hostname through the tunnel to `http://127.0.0.1:5173`. Keep provider webhook routes separate and path-restricted. Vite's allowed-host setting is not authentication. The laptop and tunnel must remain running.
 
+### Public interactive preview
+
+Run `npm run build:preview` to create a separate static site in `dist-preview/`. Upload the contents of that folder to a static host, such as Cloudflare Pages. This build displays a preview notice, returns an empty graph locally, blocks application requests, and disables browser voice recognition; AI, saving and messaging do not work. A preview-only Content Security Policy blocks network connections as a second layer. Text typed into the interface is held in the page and cleared on reload. Deploy the static output only, never `.env`, the database, or the backend.
+
 ## Privacy and limits
 
 Analysis, drafting, reply analysis, and recovery send relevant entered or saved context to the configured AI provider. If enabled, Cloudflare Workers AI also receives the insight text being compared for deduplication. The voice provider receives call audio and the account submitted to its capture tool. Browser speech recognition can use an external speech provider. These are external services, not a private training sandbox.
