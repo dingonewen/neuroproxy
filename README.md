@@ -2,30 +2,102 @@
 
 **For minds that wander, and hearts that care.**
 
-NeuroProxy is a voice-first companion that helps neurodivergent minds remember, connect, and communicate. It turns conversations into a reviewable Cognitive Action Graph, suggests a next step, and helps the user follow through with an explicitly approved message.
+NeuroProxy is a voice-first companion that helps neurodivergent people remember, connect, and communicate. It turns a conversation into a reviewable Cognitive Action Graph, helps its user take a next step through iMessage, and remembers the context when a reply comes back.
 
-The prototype is an accessibility and communication aid. It does not diagnose or treat medical conditions.
+I built NeuroProxy from my own experience with ADHD: I can care deeply about someone and still lose track of what they said, miss a message, or struggle to find the words to reply. I want the people around me to know that even when my mind wanders, my heart cares. [Read the project vision](docs/VISION.md).
 
-## The workflow
+NeuroProxy is an accessibility and communication aid, not a medical device. It does not diagnose or treat a condition.
 
-1. **Hear the Meaning:** Type, use browser speech recognition, or call the Photon voice number to capture a conversation. The agent extracts people, questions, tasks, relationship context, and a possible message draft.
-2. **See the Bigger Picture:** Review and save the context, then explore the Graph. Choose a saved conversation, select nodes, zoom, and export the Graph as a PDF. The review-order headings do not establish causation.
-3. **Make Things Happen:** Use Delegation to choose a person and action and generate a draft. In Messages, review or edit the draft, select a recipient, confirm their identity and consent, and approve the real message. Incoming replies can be analyzed to suggest a follow-up. AutoReply can be enabled separately for an eligible iMessage conversation; one real reply has been manually verified, while off-switch and opt-out behavior still need separate live tests.
-4. **Find Your Way Back:** Ask questions about saved context; supported browsers can also read answers aloud.
+## From a conversation to a connection
 
-Reported facts, expressed feelings and needs, and possible interpretations are kept distinct. The user can correct suggestions. Generated relationship insights are limited and compared with existing same-category entries using conservative **lexical** cosine similarity. Reply analysis can additionally use optional Cloudflare embeddings for high-threshold semantic deduplication; initial extraction remains lexical. Semantic matching currently falls back to lexical matching for Chinese text and on provider errors. This is not vector-database search.
+Imagine telling NeuroProxy that you want to reconnect with a friend but are unsure how to respond. The prototype supports a complete loop:
 
-## What has been verified
+1. **Hear the Meaning.** Type, speak in a supported browser, or call the Photon voice number. The agent extracts people, tasks, open questions, reported facts, feelings, and possible interpretations. You review and correct its suggestions.
+2. **See the Bigger Picture.** Save the reviewed context as a persistent, interactive Graph. Explore its connections, select nodes, and export the Graph. The relationship headers indicate review order; they do not prove causation.
+3. **Make Things Happen.** Choose an action and a recipient, generate or edit a draft, and explicitly approve a real iMessage. A reply returns through Photon and can be analyzed to help you prepare the next message. An independently enabled, experimental AutoReply can respond without approval for each message and identifies itself as automated.
+4. **Find Your Way Back.** Ask a question about saved context or message history. A read-only memory tool retrieves relevant Graph records and can show sources that link back to the Graph. Supported browsers can read the answer aloud.
 
-- A real Photon iMessage was sent to the developer's test iPhone, and a reply was received through the configured webhook. A subsequent live AutoReply produced a relevant response, as confirmed by the developer.
-- A real inbound phone call through Photon and ElevenLabs produced a reviewable Graph on the web.
-- An outbound ElevenLabs test call through the Photon number connected to the developer's own iPhone. Caller ID, two-way audio, and call termination have not yet been separately verified.
-- The developer has completed an end-to-end validation of the core delegation workflow, including reply analysis and follow-up.
-- Graph PDF export was manually checked for correctness; its visual presentation could still be improved.
-- The developer has reviewed the mobile interface and its swipe navigation between workflow sections.
-- Simulated messages and automated mock tests exercise the approval and reply pipelines without contacting a real person.
+The desktop and mobile web interfaces share this workflow. On mobile, colored tabs and horizontal swipes switch sections while the Graph retains its own gestures. Neither a native iOS app nor a second phone is required for the developer's test setup.
 
-The core MVP has been validated end to end. The mobile interface has been reviewed, though the final demo flow still needs a rehearsal. Live SMS sending has not been verified. Photon accepting a request does not confirm delivery. See [CHECKLIST.md](CHECKLIST.md) for demo status and [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical notes.
+## Why this is an agent
+
+NeuroProxy combines AI interpretation with application-controlled tools and state:
+
+| Capability | How the prototype uses it |
+| --- | --- |
+| **Reason and plan** | Model-backed analysis separates reported facts, feelings, and possible interpretations, then proposes actions and drafts for review. |
+| **Act** | An approved delegation becomes a real Photon iMessage. Incoming webhook events are matched to saved context so a reply can inform the next step. |
+| **Remember** | A persistent Graph stores reviewed context, messages, and reply progress. The read-only `recall_memory` tool uses local BM25 to select a bounded set of relevant records for a question. |
+| **Adapt to context** | Later drafts and recovery can use saved context and the user's edits; AutoReply can use a user-entered communication preference. The prototype does **not** train a personal model or automatically learn a personality. |
+| **Keep the user in control** | Ordinary messages require explicit approval. AutoReply is off by default, is authorized separately, and labels each automatic message. |
+
+This is a practical accessibility workflow built around a real personal need, not a claim of measured clinical effectiveness or a completed user study. More about the design and longer-term direction is in [Vision](docs/VISION.md) and [Decisions](docs/DECISIONS.md).
+
+## Architecture
+
+```mermaid
+flowchart TD
+    user["User: desktop or mobile web"] -->|"text or browser speech"| extract["Conversation analysis and structured extraction"]
+    phone["User: phone call"] -->|"Photon SMS voice number / SIP"| voice["ElevenLabs voice agent"]
+    voice -->|"caller-approved capture"| extract
+    extract --> review["User reviews context and suggestions"]
+    review --> graph[("SQLite: Cognitive Action Graph, messages and reply progress")]
+    graph --> visual["React Flow: explore and export Graph"]
+    graph --> draft["Choose recipient and draft message"]
+    draft -->|"explicit approval"| photon["Photon 2.0 iMessage"]
+    photon --> recipient["Recipient"]
+    recipient -->|"reply"| webhook["Signed Photon webhook"]
+    webhook --> graph
+    graph --> followup["Analyze reply and review follow-up"]
+    graph -->|"separately enabled for eligible contact"| auto["Experimental, labeled AutoReply"]
+    auto --> photon
+    user -->|"ask a question"| memory["Read-only recall_memory tool"]
+    graph --> memory
+    memory -->|"BM25-selected records and source IDs"| answer["Answer with links to Graph sources"]
+    answer --> user
+```
+
+The web app uses React, TypeScript, React Flow and Vite. The TypeScript backend uses Fastify, Mastra-powered model calls and SQLite. Structured outputs are validated before saving; message authorization, webhook verification, matching, state transitions and duplicate-send handling are controlled by application logic rather than left to the model.
+
+**Memory:** `recall_memory` retrieves a bounded set of Graph nodes and nearby message links; the server checks cited IDs against retrieved records before displaying source links. That validates the IDs, not whether every claim is supported by its citation. Retrieval can miss relevant context, particularly with different wording; no-match queries fall back to recent nodes. Verify important answers against Messages. This tool and source-link UI have automated coverage but still need a live end-to-end check.
+
+**Insight deduplication:** Initial extraction uses lexical similarity to limit repeated insights. Reply analysis can optionally use Cloudflare Workers AI BGE-M3 embeddings for same-category comparisons; Chinese text and provider errors fall back to lexical matching. Embeddings are held in memory, not saved. This is not a vector database or semantic memory retrieval, and the Cloudflare integration has not yet been verified against a live account.
+
+## What works today
+
+| Capability | Status |
+| --- | --- |
+| Approved iMessage and incoming reply | Manually tested with the developer's iPhone, including reply analysis and follow-up. |
+| AutoReply | One relevant real iMessage AutoReply was manually verified. The off switch, opt-out and disclosure still need separate live verification. |
+| Inbound phone voice | A Photon-to-ElevenLabs call produced a reviewable Graph. |
+| Outbound phone voice | An ElevenLabs test call through Photon connected. Caller ID, two-way audio and call termination have not been separately verified. The app has no outbound call control yet. |
+| Graph export and mobile interface | PDF content and mobile navigation were manually reviewed; the PDF's visual presentation can improve. |
+| Recall sources and Cloudflare embeddings | Automated coverage exists; live provider and UI verification remains. |
+| SMS messaging | Not verified; campaign registration remains unresolved. SMS is not exposed as a sending option in the demo UI. |
+
+Photon accepting a send request is not confirmation that it was delivered. Automated tests and simulated messages complement the real tests above; simulations must not be presented as real delivery. See the [checklist](docs/CHECKLIST.md) for remaining work.
+
+## Photon, approval and AutoReply
+
+NeuroProxy uses Photon 2.0 for iMessage and for the SMS-number voice channel. A shared iMessage line requires the recipient to be assigned a shared-line number and to message it first; assignment does not imply consent. The app stores contacts locally; it does not import the phone's address book. After choosing a contact, it matches the most recently received iMessage conversation for that address. Check the recipient and message, confirm consent, and choose **Approve & Send Message**. See [Photon's iMessage guide](https://photon.codes/docs/beta/get-started/imessage).
+
+AutoReply is a separate experimental authorization for an eligible contact within a saved conversation, after an approved iMessage has been sent. When enabled, it can send subsequent replies without individual approval. Every automatic message begins with `[NeuroProxy AutoReply]`. Ambiguous matches remain for manual review. Recognized stop-contact requests disable AutoReply, but simple matching cannot recognize every wording. A repeated previous message triggers one revision attempt; if it still repeats or no reply is suggested, the job stops for review. An uncertain send is not automatically retried; an already submitting message may not be stopped by switching AutoReply off. Test only with consenting participants, and do not rely on unverified behavior.
+
+Configure `PHOTON_API_KEY`, `PHOTON_PROJECT_ID` and `PHOTON_WEBHOOK_SECRET`. `npm run check:photon` checks project access read-only; it does not verify delivery or webhook setup. Subscribe a Photon destination to `message.received` and route it over HTTPS to `POST /api/webhooks/photon`. The backend verifies the signature and timestamp, ignores duplicate webhook deliveries, and links matched replies; uncertain matches require confirmation. If a send outcome is unknown, check Photon before sending again.
+
+## Voice
+
+Browser speech recognition can capture text in **Hear the Meaning** and **Find Your Way Back**. It may send audio to the browser's speech provider. Voice input does not approve or send messages.
+
+For phone calls, Photon routes an eligible SMS number over SIP to ElevenLabs. With the caller's permission, the agent calls the protected `POST /api/voice/capture` tool to create a proposed Graph and possibly a draft for web review. It cannot approve or send messages. The bridge currently saves at most one Graph per call; the tool bearer token authenticates ElevenLabs, **not the caller**. Phone access to saved context, voice approval, automatic call-to-text continuity, and asynchronous voice messages are not implemented. An outbound test can be initiated from ElevenLabs through the configured Photon SIP trunk; it is not yet controlled from NeuroProxy. A shared iMessage line cannot receive calls.
+
+To configure the phone bridge:
+
+1. Set a unique random `VOICE_TOOL_SECRET` of at least 32 characters in `.env` and restart the backend. Store the same value as an ElevenLabs secret, never in a prompt, URL, or source control.
+2. Configure the Photon SMS number and ElevenLabs agent for inbound SIP using [Photon's voice guide](https://photon.codes/docs/beta/get-started/voice).
+3. Expose only `/api/voice/capture` and `/api/webhooks/photon` over HTTPS. **Do not expose the rest of `/api`**: the local API has no general authentication.
+4. Configure an [ElevenLabs webhook tool](https://elevenlabs.io/docs/eleven-agents/customization/tools/webhook-tools) to POST JSON with a bearer token from its secret store. Bind `conversationId` to `system__conversation_id` and provide a concise caller-approved `text` parameter of at most 8,000 characters.
+5. Instruct the agent to ask before capturing, summarize only the tool's result, and explain that the Graph and draft require review. It must not claim that a message was sent.
 
 ## Run locally
 
@@ -34,7 +106,7 @@ Requirements: Node.js 24 or newer and npm.
 ```bash
 npm install
 cp .env.example .env
-# If ElevenLabs onboarding has not already created it:
+# If ElevenLabs onboarding has not already created this file:
 touch .env.local
 npm run dev
 ```
@@ -45,60 +117,21 @@ In a second terminal:
 npm run dev:web
 ```
 
-Fill in `.env` locally with the model provider credentials and any Photon configuration you need. Never commit secrets or put them in `.env.example`. The backend loads `.env` and `.env.local` at startup; restart it after changing configuration or backend code. Open the Vite URL printed by the frontend command. The backend listens on localhost; SQLite state defaults to `neuroproxy.db` and can be redirected with `NEUROPROXY_DB`.
+Fill in the required model credentials in `.env`, plus the Photon and voice settings for the features you use. ElevenLabs onboarding stores its API key in ignored `.env.local`. Never commit secrets or put real credentials in `.env.example`. Restart the backend after changing its configuration or code. Open the Vite URL printed by the frontend command. SQLite defaults to `neuroproxy.db`; `NEUROPROXY_DB` can select another path.
 
 ```bash
 npm test
 npm run build
 ```
 
-## Messaging and contacts
+For private phone access, use a separate HTTPS hostname protected by Cloudflare Access and restricted to your account. Set `NEUROPROXY_WEB_HOST` to that exact hostname, restart Vite, and route the hostname through the tunnel to `http://127.0.0.1:5173`. Keep provider webhook routes separate and path-restricted. Vite's allowed-host setting is not authentication. The laptop and tunnel must remain running.
 
-Add or select a locally stored contact using an E.164 phone number or iMessage email; the app does not import the phone's address book. For a pending draft, Revisit lets you edit and save the message or discard the draft. After you select a contact, NeuroProxy automatically matches the most recently received iMessage conversation for that address. Check the recipient and message, confirm the recipient has consented, and choose **Approve & Send Message**. SMS sending is not exposed in the demo interface while campaign registration remains unresolved.
+## Privacy and limits
 
-**AutoReply:** An experimental feature, off by default. One real iMessage AutoReply was manually verified by the developer; the off switch, opt-out handling, and disclosure still need separate live verification. It is separate from the manual approval flow. After an approved iMessage has been sent to a contact, the user can enable AutoReply for that person in a saved conversation and optionally describe a preferred communication style. This authorizes real iMessage replies without approval for each reply. Every automatic reply begins with `[NeuroProxy AutoReply]`, and the same text is saved in the Graph. It is limited to the selected recipient and Photon conversation; ambiguous replies stay for manual review. Recognized stop-contact requests such as STOP or "do not contact" disable AutoReply; this simple matcher does not recognize every possible wording. If a suggestion repeats the previous outgoing message, AutoReply asks for one revision; if it still repeats or no reply is suggested, it stops for manual review. An uncertain send result is not retried automatically. An already submitting message may not be stopped by switching the setting off. AutoReply does not learn a personality automatically or read a `skills.md` file; its style preferences are entered by the user. Test with consenting participants before relying on it.
+Analysis, drafting, reply analysis, and recovery send relevant entered or saved context to the configured AI provider. If enabled, Cloudflare Workers AI also receives the insight text being compared for deduplication. The voice provider receives call audio and the account submitted to its capture tool. Browser speech recognition can use an external speech provider. These are external services, not a private training sandbox.
 
-For a Photon iMessage shared line, the recipient must first be assigned a shared-line number and send a message to it; NeuroProxy can then use the signed inbound event to locate the direct conversation. A shared-line assignment does not itself imply consent. See [Photon's Beta iMessage guide](https://photon.codes/docs/beta/get-started/imessage).
+Local SQLite stores conversations, contacts and message records. Deleting a conversation removes its associated local Graph, drafts and message records, but not messages already sent through Photon or present on recipients' devices; contacts remain. Hashed event identifiers remain to prevent replaying deleted incoming events. Transcripts from the retired voice-note feature, if any, remain in the `voice_notes` table. Use synthetic data for demonstrations where practical.
 
-Configure `PHOTON_API_KEY`, `PHOTON_PROJECT_ID`, and `PHOTON_WEBHOOK_SECRET` in `.env`. For SMS, also configure `PHOTON_SMS_NUMBER` in E.164 format. `npm run check:photon` performs a read-only project access check; it does not verify delivery or webhook configuration.
+Optional OpenTelemetry/Logfire tracing exports allowlisted diagnostic metadata such as status and timing, not intentionally conversation content, contacts, credentials or raw provider errors. Configure `LOGFIRE_TOKEN` and optionally `LOGFIRE_BASE_URL`; without a token, traces are not exported. Live Logfire export remains to be verified.
 
-Subscribe the Photon destination to `message.received` and route it to `POST /api/webhooks/photon` over HTTPS. The backend verifies the raw-body signature and timestamp. Matched replies are linked; uncertain matches require confirmation, and other replies can be associated manually. Duplicate webhook deliveries are ignored. If a send outcome is unknown, check Photon before attempting another send.
-
-Select a saved conversation and use **Delete** to remove its local graph, drafts, and messaging records. Messages already sent remain in Photon and on recipients' devices. Hashed event identifiers remain to prevent deleted incoming events from reappearing on webhook replay. Deleting a conversation leaves reusable contacts intact.
-
-## Voice
-
-**Legacy voice-note data:** The retired browser voice-note feature is no longer available. Its previously stored transcripts and analyses, if any, remain in the local SQLite database's `voice_notes` table; removing the feature does not erase existing data.
-
-**Suggested delegation:** Delegate reuses the suggested action saved in the conversation and preselects the person when there is only one. You can change the action or recipient and generate a message draft for separate approval. If analysis already suggested a message, its draft appears in Messages. Generating a message sends the saved conversation to the configured AI provider.
-
-**Recovery and AutoReply history:** Recall ranks saved conversation groups locally using BM25, while retaining all groups as context. The read-only Graph tool exposes recorded AutoReply state, incoming-reply time when available, and dispatch preparation time; Photon acceptance is not delivery confirmation. Stored timestamps do not establish when the user was away. The tool may still miss details or misunderstand a question, so verify its summary against Messages.
-
-**Reply progress:** Reply analysis and in-progress follow-up text are saved in the local SQLite database so the user can return to them from another browser connected to the same backend. Saving the reviewed analysis to the Graph and creating or sending a message remain separate actions. Creating the follow-up draft removes the temporary reply progress; deleting the conversation also deletes it. Earlier analyses created before this feature may not have a saved suggestion.
-
-**Private phone access:** `localhost` on an iPhone points to the phone itself. To reach the laptop, use a separate HTTPS hostname protected by a Cloudflare Access application with a policy limited to your own account. Set `NEUROPROXY_WEB_HOST` to that exact hostname and restart Vite, then route the hostname through the tunnel to `http://127.0.0.1:5173`. Keep the existing provider webhook hostname and its path restrictions separate. Vite's allowed-host setting is not authentication: do not create an unprotected public route to the app or its API. The laptop and tunnel must remain running.
-
-On mobile, the four workflow sections share the desktop's Coral theme and are shown one at a time. Use the colored tabs or swipe horizontally outside interactive controls to switch sections; scroll vertically within a section. Graph gestures stay on the canvas, and selecting a graph node opens the related section.
-
-**Browser:** On a supported browser, choose a language and turn on the voice switch in Hear the Meaning or Find Your Way Back. Allow microphone access, speak, and turn the switch off before reviewing the recognized text. Browser speech recognition may send audio to the browser's speech provider. Voice input does not send or approve messages.
-
-**Phone:** Photon routes an inbound call on an eligible SMS number to an ElevenLabs agent over SIP. With the caller's permission, the agent invokes the protected `POST /api/voice/capture` tool, which creates a proposed Graph and may create a draft. The web app displays the result for review; the phone tool cannot send or approve messages. An outbound test call can be initiated from ElevenLabs through the configured Photon SIP trunk; NeuroProxy does not yet provide an outbound call control. A shared iMessage line cannot receive phone calls.
-
-The current bridge saves at most one Graph per call. Its bearer token authenticates the ElevenLabs tool, **not the caller**. Phone access to stored context, voice approval, automatic call-to-text continuity, and multiple updates in one call are not implemented. A live inbound call has produced a Graph; an outbound test connected, but its detailed audio and call termination checks remain open.
-
-To configure the bridge:
-
-1. Set a unique random `VOICE_TOOL_SECRET` of at least 32 characters in `.env` and restart the backend. Store the same value as an ElevenLabs secret; do not put it in a prompt, URL, or source control.
-2. Configure a Photon SMS number and ElevenLabs agent for inbound SIP using [Photon's voice guide](https://photon.codes/docs/beta/get-started/voice).
-3. Expose only `/api/voice/capture` and `/api/webhooks/photon` through HTTPS. **Do not expose the rest of `/api`**: the local API has no general authentication.
-4. Configure an ElevenLabs webhook tool to `POST` JSON to the voice capture route, with an `Authorization: Bearer ...` header supplied from the provider's secret store. Provide `conversationId` bound to `system__conversation_id` and a concise `text` parameter containing the caller-approved account, up to 8,000 characters. See [ElevenLabs webhook tools](https://elevenlabs.io/docs/eleven-agents/customization/tools/webhook-tools).
-5. Have the agent ask permission before capturing, summarize only the tool's returned result, and make clear that the Graph and draft need review. Do not claim a message was sent.
-
-## Privacy and observability
-
-Analysis, draft generation, reply analysis, and recovery send the relevant entered or saved context to the configured AI provider. When `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_AI_TOKEN` are set, reply-insight deduplication also sends selected insight text from the same conversation to Cloudflare Workers AI BGE-M3. Embeddings are held in memory and are not stored; an unavailable or invalid provider response falls back to lexical matching. The Cloudflare integration is optional and has not been verified against a live account. The voice provider receives call audio and the account submitted to its tool. Data is stored locally in SQLite; deleting a conversation removes its associated local graph and message records as described above. Use synthetic data in demos.
-
-OpenTelemetry analysis tracing is optional. Set `LOGFIRE_TOKEN` in the ignored `.env` file and, if needed, `LOGFIRE_BASE_URL` for the correct region. Restart the backend after changes. With no token, no traces are exported. The application exports only its allowlisted manual analysis spans, with status, timing, and safe diagnostic categories; it does not intentionally include conversation text, contact details, credentials, or raw provider errors. Live Logfire export still needs verification.
-
-The Coral theme and third-party notices are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-The empty-state curves adapt BoldKit's MathCurveLoader and use its MIT-licensed math curve engine; see [the BoldKit license](THIRD_PARTY_LICENSES/boldkit.txt).
+Further technical details are in [Implementation](docs/IMPLEMENTATION.md). The Coral theme, BoldKit curve adaptations and other dependencies are documented in [Third-party notices](THIRD_PARTY_NOTICES.md) and the [BoldKit license](THIRD_PARTY_LICENSES/boldkit.txt).
