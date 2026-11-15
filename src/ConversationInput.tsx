@@ -7,6 +7,7 @@ import { EmptyCurve } from './EmptyCurve';
 import { SavedContext } from './SavedContext';
 import { optionLabel } from './option-label';
 import { VoiceInput } from './VoiceInput';
+import { readApiJson } from './api-response';
 
 export function ConversationInput({ onSaved, onPreview, savedNodes, showingPreview, navigation, onRefresh }: { onSaved: (topicId:string, context:Extraction, draftId:string|null) => Promise<void>; onPreview:(result:Extraction|null)=>void; savedNodes:{id:string;kind:string;label:string;status:string;source:string;contact_id?:string|null;contact_name?:string|null;contact_handle?:string|null}[]; showingPreview:boolean; navigation:{id:string;nonce:number}|null; onRefresh:()=>Promise<void> }) {
  const [text, setText] = useState('');
@@ -22,7 +23,7 @@ export function ConversationInput({ onSaved, onPreview, savedNodes, showingPrevi
   setBusy(true); setError(''); setSaved(false); setResult(null);
   try {
    const res = await fetch('/api/extract', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({text}) });
-   const data = await res.json(); if (!res.ok) throw new Error(data.error); setResult(data);
+   const data = await readApiJson(res); if (!res.ok) throw new Error(data.error); setResult(data);
   } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
  }
  async function save() {
@@ -32,7 +33,7 @@ export function ConversationInput({ onSaved, onPreview, savedNodes, showingPrevi
    const relationship=result.relationship ? {...result.relationship, facts:result.relationship.facts.filter(v=>v.trim()),feelings:result.relationship.feelings.filter(v=>v.trim()),needs:result.relationship.needs.filter(v=>v.trim()),interpretations:result.relationship.interpretations.filter(v=>v.trim())} : result.relationship;
    const reviewed={...result,relationship};
    const res = await fetch('/api/reviewed-context', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(reviewed) });
-   const data = await res.json(); if (!res.ok) throw new Error(data.error);
+   const data = await readApiJson(res); if (!res.ok) throw new Error(data.error);
    setResult(null); setSaved(true);
    try { await onSaved(data.topicId, reviewed, data.draftId ?? null); } catch { setError('Saved, but the graph could not refresh. Reload the page.'); }
   } catch (e) { setError((e as Error).message); } finally { setBusy(false); }

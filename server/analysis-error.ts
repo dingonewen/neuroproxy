@@ -2,10 +2,11 @@
 export function describeAnalysisError(error: unknown): {kind:string; message:string} {
  const seen=new Set<unknown>();
  const queue:unknown[]=[error];
- let status:number|undefined; let schemaError=false; let networkError=false; let missingModel=false; let missingKey=false;
+ let status:number|undefined; let schemaError=false; let networkError=false; let missingModel=false; let missingKey=false;let timedOut=false;
  while(queue.length && seen.size<30) {
   const current=queue.shift();if(!current || typeof current!=='object' || seen.has(current))continue;seen.add(current);
   const e=current as Record<string,unknown>;
+  if(e.name==='ModelTimeoutError' || e.name==='TimeoutError')timedOut=true;
   const candidate=e.statusCode ?? e.status;
   if(typeof candidate==='number' && candidate>=400 && candidate<=599) status ??= candidate;
   if(e.name==='ZodError' || e.name==='ExtractionValidationError' || e.name==='AI_TypeValidationError' || e.name==='TypeValidationError' || e.name==='AI_NoObjectGeneratedError' || e.name==='AI_NoOutputGeneratedError') schemaError=true;
@@ -17,6 +18,7 @@ export function describeAnalysisError(error: unknown): {kind:string; message:str
  }
  if(missingModel)return {kind:'missing_model',message:'Set NEUROPROXY_MODEL in .env and restart the backend.'};
  if(missingKey)return {kind:'missing_key',message:'The model provider API key is missing. Check .env and restart the backend.'};
+ if(timedOut)return {kind:'timeout',message:'The AI provider did not finish within 90 seconds. Please try again or use a shorter conversation.'};
  if(status===429)return {kind:'rate_limit',message:'The model provider returned HTTP 429 (rate limit or quota). Check its rate limits and account quota, then retry.'};
  if(status===401 || status===403)return {kind:'authentication',message:'The model provider rejected authentication or access (HTTP '+status+'). Check the API key and model access.'};
  if(status===404)return {kind:'model_not_found',message:'The model provider returned HTTP 404. Check the model name and account access.'};

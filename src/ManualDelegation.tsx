@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { delegationDefaults } from '../shared/delegation-defaults';
 import { optionLabel } from './option-label';
 import { InfoTip } from './InfoTip';
+import { readApiJson } from './api-response';
 
 type Item={id:string;kind:string;label:string};
 export function ManualDelegation({topicId,nodes,onSaved}:{topicId:string;nodes:Item[];onSaved:()=>Promise<void>}) {
@@ -17,8 +18,8 @@ export function ManualDelegation({topicId,nodes,onSaved}:{topicId:string;nodes:I
  const selection={personId:personId==='new'?'':personId,newPerson:personId==='new'?newPerson:'',actionId:actionId==='custom'?'':actionId,customAction:actionId==='custom'?customAction:''};
  const validPerson=!!selection.personId || !!selection.newPerson.trim();const validAction=!!selection.actionId || !!selection.customAction.trim();
  const changed=(fn:()=>void)=>{fn();setBody('');setNotice('');};
- async function generate(){setBusy(true);setNotice('');setBody('');try{const r=await fetch(`/api/conversations/${encodeURIComponent(topicId)}/delegation-suggestion`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(selection)});const data=await r.json();if(!r.ok)throw Error(data.error);if(!data.body){setNotice(data.reason ? `No draft suggested: ${data.reason}` : 'The model did not suggest a draft. You can edit the message yourself if appropriate.');return;}setBody(data.body);}catch(e){setNotice((e as Error).message);}finally{setBusy(false);}}
- async function save(){setBusy(true);setNotice('');try{const r=await fetch(`/api/conversations/${encodeURIComponent(topicId)}/drafts`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...selection,body})});const data=await r.json();if(!r.ok)throw Error(data.error);setBody('');setNotice('Draft added to this conversation. Review it in Messages before sending.');await onSaved();}catch(e){setNotice((e as Error).message);}finally{setBusy(false);}}
+ async function generate(){setBusy(true);setNotice('');setBody('');try{const r=await fetch(`/api/conversations/${encodeURIComponent(topicId)}/delegation-suggestion`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(selection)});const data=await readApiJson(r);if(!r.ok)throw Error(data.error);if(!data.body){setNotice(data.reason ? `No draft suggested: ${data.reason}` : 'The model did not suggest a draft. You can edit the message yourself if appropriate.');return;}setBody(data.body);}catch(e){setNotice((e as Error).message);}finally{setBusy(false);}}
+ async function save(){setBusy(true);setNotice('');try{const r=await fetch(`/api/conversations/${encodeURIComponent(topicId)}/drafts`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...selection,body})});const data=await readApiJson(r);if(!r.ok)throw Error(data.error);setBody('');setNotice('Draft added to this conversation. Review it in Messages before sending.');await onSaved();}catch(e){setNotice((e as Error).message);}finally{setBusy(false);}}
  return <div className="manual-delegation">
   <label>Person<select disabled={busy} value={personId} title={people.find(p=>p.id===personId)?.label} onChange={e=>changed(()=>{touched.current.person=true;setPersonId(e.target.value);})}><option value="">Choose a person</option>{people.map(p=><option key={p.id} value={p.id} title={p.label}>{optionLabel(p.label)}</option>)}<option value="new">Add a person</option></select></label>
   {personId==='new' && <label>New Person<input disabled={busy} maxLength={100} value={newPerson} onChange={e=>changed(()=>setNewPerson(e.target.value))}/></label>}

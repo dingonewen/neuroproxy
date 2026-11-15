@@ -16,6 +16,7 @@ import { generateManualMessage, type ManualMessageGenerator } from './manual-mes
 import { analyzeReply, replyAnalysisSchema, type ReplyAnalyzer } from './reply-analysis.ts';
 import { elevenLabsAgentStatus } from './elevenlabs.ts';
 import type { ReplyProgress } from '../shared/reply-progress.ts';
+import { withModelTimeout } from './model-timeout.ts';
 export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply, recoveryOverride?:(question:string,recalled:Map<string,RecoverySource>)=>Promise<{text:string}>) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
@@ -143,7 +144,7 @@ app.post('/api/ask', async (req) => {
   if (typeof question !== 'string' || !question.trim() || question.length > 2000) throw new Error('Enter a question (maximum 2000 characters).');
   if (!process.env.NEUROPROXY_MODEL && !recoveryOverride) throw new Error('Set NEUROPROXY_MODEL and the provider credentials to use context recovery.');
   const recalled=new Map<string,RecoverySource>();
-  const result = recoveryOverride ? await recoveryOverride(question,recalled) : await createAgent(store,question,recalled).generate(question, { maxSteps: 5 });
+  const result = recoveryOverride ? await recoveryOverride(question,recalled) : await withModelTimeout(signal=>createAgent(store,question,recalled).generate(question, { maxSteps: 5, abortSignal:signal }));
   const current=store.graph();
   if(!recalled.size) return {answer:current.nodes.length ? 'I could not retrieve the saved context. Please try again.' : 'There is no saved context to recall yet.',sources:[]};
   const currentById=new Map(current.nodes.map(node=>[String(node.id),node]));

@@ -4,6 +4,9 @@ NeuroProxy uses TypeScript end to end.
 
 ## Code review fixes
 
+- Model extraction (including its retry and optional draft suggestion), message generation, reply analysis, and Recall have a 90-second deadline and pass cancellation signals to Mastra. A slow provider returns an error before the Cloudflare read timeout; this does not make the provider itself faster.
+- The web UI recognizes Cloudflare 524 and HTML error/login pages for analysis, delegation, and Recall requests instead of reporting a raw JSON parsing error.
+
 - AutoReply distinguishes standalone opt-out commands and explicit stop-contact requests from ordinary phrases such as "I can stop by Friday." Mock tests cover both opt-out and continued messaging.
 - iMessage sending validates local Photon configuration before reserving a draft, so missing credentials leave it editable and awaiting approval rather than stuck submitting.
 - Delegation inputs are locked while generating or saving a draft, keeping the generated message associated with the chosen recipient and action.
