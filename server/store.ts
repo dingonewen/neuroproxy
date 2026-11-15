@@ -4,6 +4,7 @@ import { validateExtraction, relationshipSchema, type Extraction } from '../shar
 import type { PhotonMessage } from './photon-webhook.ts';
 import { groupGraph } from '../shared/graph-groups.ts';
 import { labelRealSms } from '../shared/sms.ts';
+import { replyProgressSchema, type ReplyProgress } from '../shared/reply-progress.ts';
 
 const eventHash=(value:string)=>createHash('sha256').update(value).digest('hex');
 
@@ -22,6 +23,7 @@ export class Store {
     this.db.exec(`CREATE TABLE IF NOT EXISTS voice_captures (capture_hash TEXT PRIMARY KEY, topic_id TEXT REFERENCES nodes(id) ON DELETE SET NULL, summary TEXT NOT NULL);`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS voice_notes (id TEXT PRIMARY KEY, status TEXT NOT NULL, transcript TEXT, analysis TEXT); UPDATE voice_notes SET status='interrupted' WHERE status='processing';`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS reply_insights_reviewed (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE);`);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS reply_progress (reply_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE, stage TEXT NOT NULL, data TEXT NOT NULL);`);
   }
   createVoiceNote() { const id=randomUUID(); this.db.prepare("INSERT INTO voice_notes (id,status) VALUES (?, 'processing')").run(id); return id; }
   voiceNote(id:string) { const row=this.db.prepare('SELECT status,transcript,analysis FROM voice_notes WHERE id=?').get(id) as {status:string;transcript:string|null;analysis:string|null}|undefined; return row ? {status:row.status, transcript:row.transcript, analysis:row.analysis ? JSON.parse(row.analysis) : null} : null; }
@@ -51,7 +53,7 @@ export class Store {
     this.db.exec('BEGIN IMMEDIATE');try {
       if(!this.db.prepare("SELECT 1 FROM nodes WHERE id=? AND kind='person'").get(personId)||!this.db.prepare('SELECT 1 FROM contacts WHERE id=?').get(contactId))throw Error('Person or contact not found.');
       const current=this.db.prepare('SELECT contact_id FROM person_contacts WHERE person_id=?').get(personId) as {contact_id:string}|undefined;
-      if(current?.contact_id!==contactId && this.db.prepare("SELECT 1 FROM drafts WHERE person_id=? AND state NOT IN ('pending_approval','cancelled') LIMIT 1").get(personId)) {
+      if(current?.contact_id!==contactId && this.db.prepare("SELECT 1 FROM drafts d JOIN nodes m ON m.id=d.message_id WHERE d.person_id=? AND d.state NOT IN ('pending_approval','cancelled') AND (m.source='photon' OR d.state IN ('preparing','submitting')) LIMIT 1").get(personId)) {
         if(this.db.prepare("SELECT 1 FROM drafts WHERE person_id=? AND state IN ('preparing','submitting') LIMIT 1").get(personId)) throw Error('A message is being sent. Try again after it finishes.');
         const target=this.db.prepare('SELECT handle FROM contacts WHERE id=?').get(contactId) as {handle:string};
         const previous=current && this.db.prepare('SELECT handle FROM contacts WHERE id=?').get(current.contact_id) as {handle:string}|undefined;
@@ -323,12 +325,31 @@ export class Store {
       const reply=this.db.prepare("SELECT id FROM nodes WHERE id=? AND kind='reply' AND status='received'").get(replyId);
       const linked=this.db.prepare("SELECT 1 FROM edges e JOIN drafts d ON d.message_id=e.source WHERE e.target=? AND e.label='reply'").get(replyId);
       if(!reply || !linked) throw Error('Confirm and link the reply before saving analysis.');
+      if(this.db.prepare('SELECT 1 FROM reply_insights_reviewed WHERE reply_id=?').get(replyId))throw Error('Reply analysis was already saved.');
       const add=(kind:string,label:string,edgeLabel:string)=>{if(!label.trim())return;const id=this.node(kind,label,'reviewed','analysis');this.edge(replyId,id,edgeLabel);};
       r.facts.forEach(v=>add('reported_fact',v,'reported'));r.feelings.forEach(v=>add('feeling',v,'expressed feeling'));r.needs.forEach(v=>add('need',v,'expressed need'));r.interpretations.forEach(v=>add('interpretation',v,'possible interpretation'));add('core_question',r.coreQuestion,'core question');add('suggested_action',r.nextAction,'suggested action');
       this.db.prepare('INSERT OR IGNORE INTO reply_insights_reviewed VALUES (?)').run(replyId);
+      const progress=this.replyProgress(replyId);
+      if(progress)this.db.prepare("UPDATE reply_progress SET stage='suggested',data=? WHERE reply_id=?").run(JSON.stringify({...progress,stage:'suggested',relationship:r}),replyId);
       this.db.exec('COMMIT');
     } catch(error) {this.db.exec('ROLLBACK');throw error;}
   }
+  replyProgress(replyId:string):ReplyProgress|null {
+    const row=this.db.prepare('SELECT data FROM reply_progress WHERE reply_id=?').get(replyId) as {data:string}|undefined;
+    return row ? replyProgressSchema.parse(JSON.parse(row.data)) : null;
+  }
+  startReplyProgress(replyId:string,relationship:ReplyProgress['relationship'],suggestedReply:string|null,person:string) {
+    const stage=this.db.prepare('SELECT 1 FROM reply_insights_reviewed WHERE reply_id=?').get(replyId)?'suggested':'review';
+    const progress=replyProgressSchema.parse({stage,relationship,suggestedReply:suggestedReply??'',action:relationship.nextAction || `Reply to ${person}`.slice(0,500)});
+    this.db.prepare('INSERT INTO reply_progress VALUES (?,?,?) ON CONFLICT(reply_id) DO NOTHING').run(replyId,stage,JSON.stringify(progress));
+    return this.replyProgress(replyId)!;
+  }
+  updateReplyProgress(replyId:string,value:unknown) {
+    const progress=replyProgressSchema.parse(value);
+    const result=this.db.prepare('UPDATE reply_progress SET data=? WHERE reply_id=? AND stage=?').run(JSON.stringify(progress),replyId,progress.stage);
+    if(!result.changes)throw Error('Reply progress is unavailable or has moved to another stage.');
+  }
+  discardReplyProgress(replyId:string) {this.db.prepare("DELETE FROM reply_progress WHERE reply_id=? AND stage='review'").run(replyId);}
   replyExistingInsights(replyId:string) {
     const graph=this.graph();
     const group=groupGraph(graph.nodes.map(n=>({id:String(n.id),kind:String(n.kind),label:String(n.label)})),graph.edges.map(e=>({source:String(e.source),target:String(e.target)}))).find(g=>g.id!=='unlinked' && g.nodeIds.has(replyId));
@@ -357,6 +378,7 @@ export class Store {
       const taskId=this.node('task',action.trim(),'pending_approval');const messageId=this.node('message',body.trim(),'pending_approval','simulated');
       this.edge(replyId,taskId,'follow-up');this.edge(taskId,messageId,'draft');this.edge(previous.person_id,messageId,'recipient');
       const id=randomUUID();this.db.prepare('INSERT INTO drafts VALUES (?,?,?,?,?,?,?)').run(id,previous.person,body.trim(),'pending_approval',previous.person_id,taskId,messageId);
+      this.db.prepare('DELETE FROM reply_progress WHERE reply_id=?').run(replyId);
       this.db.exec('COMMIT');return {id};
     } catch(error) {this.db.exec('ROLLBACK');throw error;}
   }

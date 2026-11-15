@@ -21,7 +21,7 @@ export function ConversationSelect({options,value,onChange}:{options:Option[];va
  }
  return <div className="graph-select-wrap" ref={container}>
   <button id="graph-conversation" type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} aria-activedescendant={open?`${listId}-${active}`:undefined} disabled={!options.length} title={selected?.label} onClick={()=>open?setOpen(false):show()} onKeyDown={key}>
-   <span className="graph-select-value">{selected?.label ?? 'No saved conversations'}</span><ChevronDown aria-hidden="true"/>
+   <span className="graph-select-value">{selected?.label ?? (options.length ? 'Choose a conversation' : 'No saved conversations')}</span><ChevronDown aria-hidden="true"/>
   </button>
   {open&&<div id={listId} role="listbox" className="graph-select-menu">{options.map((option,index)=><div id={`${listId}-${index}`} role="option" aria-selected={option.id===value} className={`graph-select-option${index===active?' active':''}`} key={option.id} title={option.label} onMouseMove={()=>setActive(index)} onMouseDown={event=>event.preventDefault()} onClick={()=>choose(index)}><span>{option.label}</span></div>)}</div>}
  </div>;

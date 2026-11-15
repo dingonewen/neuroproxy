@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { delegationDefaults } from '../shared/delegation-defaults';
 import { optionLabel } from './option-label';
+import { InfoTip } from './InfoTip';
 
 type Item={id:string;kind:string;label:string};
 export function ManualDelegation({topicId,nodes,onSaved}:{topicId:string;nodes:Item[];onSaved:()=>Promise<void>}) {
+ const draftInputId=useId();
  const people=nodes.filter(n=>n.kind==='person');
  const actions=nodes.filter(n=>n.kind==='task'||n.kind==='suggested_action');
  const defaults=delegationDefaults(nodes);
@@ -23,7 +25,7 @@ export function ManualDelegation({topicId,nodes,onSaved}:{topicId:string;nodes:I
   <label>Action<select value={actionId} title={actions.find(a=>a.id===actionId)?.label} onChange={e=>changed(()=>{touched.current.action=true;setActionId(e.target.value);})}><option value="">Choose an action</option>{actions.map(a=><option key={a.id} value={a.id} title={a.label}>{optionLabel(a.label)}</option>)}<option value="custom">Add an action</option></select></label>
   {actionId==='custom' && <label>New Action<input maxLength={500} value={customAction} onChange={e=>changed(()=>setCustomAction(e.target.value))}/></label>}
   <div className="manual-actions"><button className="secondary-button" type="button" disabled={busy||!validPerson||!validAction} onClick={()=>void generate()}>{busy?'Working…':'Generate'}</button></div>
-  <label>Message Draft<textarea maxLength={2000} value={body} onChange={e=>setBody(e.target.value)}/></label>
+  <div className="draft-input-label"><label htmlFor={draftInputId}>Message Draft</label><InfoTip>Clicking Create saves a draft for approval. It does not send a message.</InfoTip></div><textarea id={draftInputId} maxLength={2000} value={body} onChange={e=>setBody(e.target.value)}/>
   <div className="manual-actions"><button className="secondary-button" type="button" disabled={busy||!validPerson||!validAction||!body.trim()} onClick={()=>void save()}>Create</button></div>
   {notice && (notice.startsWith('No draft suggested: ') ? <p role="status" className="draft-suggestion-notice"><strong>No draft suggested:</strong> {notice.slice('No draft suggested: '.length)}</p> : <p className="helper-text" role="status">{notice}</p>)}
  </details>;

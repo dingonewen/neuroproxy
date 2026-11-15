@@ -102,6 +102,7 @@ The semantic memory work below is a P1 stretch goal and is not included in the o
 
 ## P2 — After the MVP / Only If Time Remains
 
+- [ ] Strengthen privacy: minimize provider context, clearly disclose data sharing and deletion scope, verify Logfire excludes sensitive content, and review provider retention and local data protection. Evaluate sandboxing only where executable tools or file access require isolation.
 - [ ] Profile Graph layout and rendering on representative data before considering WebAssembly; adopt it only if a measured bottleneck and a compatible implementation justify the added integration work.
 - [ ] Test asynchronous browser voice notes on iPhone: record and submit a clip, return to review the analysis, and play the device-voice summary without keeping a call open. The implementation is in place but has not yet been verified on a phone.
 - [ ] Add caller verification before considering phone access to saved context or voice-based approvals.

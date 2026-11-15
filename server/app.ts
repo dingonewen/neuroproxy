@@ -13,6 +13,7 @@ import { generateManualMessage, type ManualMessageGenerator } from './manual-mes
 import { analyzeReply, replyAnalysisSchema, type ReplyAnalyzer } from './reply-analysis.ts';
 import { elevenLabsAgentStatus } from './elevenlabs.ts';
 import { transcribeVoiceNote, type VoiceTranscriber } from './voice-note.ts';
+import type { ReplyProgress } from '../shared/reply-progress.ts';
 export function createApp(store: Store, extractor: Extractor = extractConversation, webhookConfig = { secret: process.env.PHOTON_WEBHOOK_SECRET, projectId: process.env.PHOTON_PROJECT_ID }, photon = new PhotonSender({apiKey:process.env.PHOTON_API_KEY,projectId:process.env.PHOTON_PROJECT_ID,smsNumber:process.env.PHOTON_SMS_NUMBER}), manualMessage:ManualMessageGenerator = generateManualMessage, replyAnalyzer:ReplyAnalyzer = analyzeReply, transcriber:VoiceTranscriber = transcribeVoiceNote) {
 const app = Fastify({ logger: false });
 app.setErrorHandler((error, _req, reply) => { reply.code(400).send({ error: error instanceof Error ? error.message : 'Request failed' }); });
@@ -112,11 +113,20 @@ app.post('/api/voice/capture', async (req,reply) => {
     return {summary:saved.voiceSummary,duplicate:saved.duplicate};
   } catch(error){const diagnosis=describeAnalysisError(error);console.error(`Voice capture failed: ${diagnosis.kind} (${analysisErrorFingerprint(error)})${diagnosis.kind==='invalid_output' ? ` [${safeValidationDetails(error)}]` : ''}`);return reply.code(502).send({error:'Could not analyze and save this call. Please try again.'});}
 });
+const replyAnalysisJobs=new Map<string,Promise<ReplyProgress>>();
 app.post('/api/replies/:id/analyze', async (req,reply) => {
-  const context=store.replyAnalysisContext((req.params as {id:string}).id);
-  try {const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer(context)));return {...analysis,relationship:filterInsights(analysis.relationship,store.replyExistingInsights((req.params as {id:string}).id),2)};}
+  const id=(req.params as {id:string}).id;const context=store.replyAnalysisContext(id);
+  const existing=store.replyProgress(id);if(existing)return existing;
+  try {
+    let job=replyAnalysisJobs.get(id);
+    if(!job){job=(async()=>{const analysis=replyAnalysisSchema.parse(await traceAnalysis('reply_analysis',()=>replyAnalyzer(context)));const relationship=filterInsights(analysis.relationship,store.replyExistingInsights(id),2);return store.startReplyProgress(id,relationship,analysis.suggestedReply,context.person);})();replyAnalysisJobs.set(id,job);void job.then(()=>replyAnalysisJobs.delete(id),()=>replyAnalysisJobs.delete(id));}
+    return await job;
+  }
   catch(error){const diagnosis=describeAnalysisError(error);const fingerprint=analysisErrorFingerprint(error);console.error(`Reply analysis failed: ${diagnosis.kind} (${fingerprint})${diagnosis.kind==='invalid_output' ? ` [${safeValidationDetails(error)}]` : ''}`);return reply.code(502).send({error:diagnosis.kind==='invalid_output' ? 'The model returned an invalid reply analysis. Please try again; nothing was saved.' : diagnosis.message,category:diagnosis.kind});}
 });
+app.get('/api/replies/:id/progress',async req=>{const id=(req.params as {id:string}).id;store.replyAnalysisContext(id);return {progress:store.replyProgress(id),processing:replyAnalysisJobs.has(id)};});
+app.put('/api/replies/:id/progress',async req=>{const id=(req.params as {id:string}).id;store.replyAnalysisContext(id);store.updateReplyProgress(id,req.body);return {ok:true};});
+app.delete('/api/replies/:id/progress',async req=>{const id=(req.params as {id:string}).id;store.replyAnalysisContext(id);store.discardReplyProgress(id);return {ok:true};});
 app.post('/api/replies/:id/insights', async (req) => {store.addReplyInsights((req.params as {id:string}).id,req.body);return {ok:true};});
 app.post('/api/replies/:id/draft', async req => {const b=req.body as {body?:unknown;action?:unknown}|null;return store.createReplyDraft((req.params as {id:string}).id,b?.body,b?.action);});
 app.post('/api/ask', async (req) => {

@@ -31,6 +31,16 @@ test('simulated delegation remains available without a contact and contact field
  }finally{store.close();}
 });
 
+test('simulated message history does not block confirming or changing a contact',()=>{
+ const store=new Store(':memory:');try{
+  const first=store.createContact('Alice','+14155550123');const second=store.createContact('Alice','+14155550124');
+  const draft=store.create('Topic','Alice','Ask','Hi');const person=String(store.graph().drafts[0].person_id);
+  store.transition(draft,'waiting_for_reply');
+  store.bindContact(person,first.id);assert.equal(store.graph().drafts[0].contact_id,first.id);
+  store.bindContact(person,second.id);assert.equal(store.graph().drafts[0].contact_id,second.id);
+ }finally{store.close();}
+});
+
 test('contact binding persists after restart and deleting a graph keeps the reusable contact',()=>{
  const dir=mkdtempSync(join(tmpdir(),'neuroproxy-contact-'));const path=join(dir,'test.db');let store=new Store(path);
  try{
